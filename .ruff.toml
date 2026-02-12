@@ -1,0 +1,25 @@
+exclude = [
+	".vscode",
+	".venv",
+	".git"
+]
+
+line-length = 150
+
+[format]
+indent-style = "tab"
+
+[lint]
+select = ["ALL"]
+ignore = [
+		"W191",    # requires indentation to be whitespaces
+		"COM812",  # requires trailing comma after last entry in list, dict etc.
+		"D206",    # requires whitespace indentation for docstrings (conflicting with tab indent)
+		"G004",    # I like f-strings in logging statements
+		"ERA001",  # This rule, about commented out code, is just stupid. It basically only consists of false positives
+	]
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.per-file-ignores]
