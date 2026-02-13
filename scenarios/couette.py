@@ -22,20 +22,14 @@ class Couette(Scenario):
 		lbm.bgk_tau = lbm.viscosity_to_bgk_tau(lbm.us.quantity(0.5, "m**2/s"))
 
 	def define_scenario(self, lbm: LBM) -> None:
-		lbm.solid[0, :] = 1
-		lbm.solid[-1, :] = 1
-
 		lbm.density[:, :] = lbm.us.quantity(1, "kg/m**3")
 
-		boundary = ZouHe(lbm.lattice)
-		boundary.setup(lbm.solid)
+		lbm.boundary = ZouHe(lbm)
 
-		vel_top = lbm.us.quantity(np.zeros((2, lbm.x), dtype=float), "m/s")
-		vel_top[0, :] = lbm.lattice.q
-		boundary.add_horizontal_velocity_profile(0, 0, lbm.x, vel_top)
-		boundary.add_horizontal_velocity_profile(-1, 0, lbm.x, lbm.us.quantity(np.zeros(lbm.x), "m/s"))
-
-		lbm.set_boundary(boundary)
+		max_speed = lbm.lattice.q
+		for x in range(lbm.x):
+			lbm.boundary.velocity_profile[0, x] = max_speed * np.array([1, 0])
+			lbm.boundary.geometry[-1, x] = 1
 
 
 if __name__ == "__main__":

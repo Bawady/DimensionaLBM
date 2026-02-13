@@ -74,7 +74,6 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 	us: UnitSystem[ModeT]
 
 	characteristic_quantities: ClassVar[list[ScalarQuantityDefinition]] = []
-	solid: np.ndarray
 
 	_width: ScalarT
 	_height: ScalarT
@@ -108,9 +107,15 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 	def lattice(self, lattice: DdQqLattice) -> None:
 		self._lattice = lattice
 
-	def set_boundary(self, boundary: Boundary) -> None:
+	@property
+	def boundary(self) -> Boundary:
+		"""Boundary class used for the simulation."""
+		return self._boundary
+
+	@boundary.setter
+	def boundary(self, boundary: Boundary) -> None:
 		if not self.lattice:
-			msg = "Cannot specify the boundary conditions without the lattice being set prior."
+			msg = "Cannot specify the boundary conditions without the lattice being set prior to it."
 			raise ValueError(msg)
 		self._boundary = boundary
 
@@ -290,7 +295,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		self.f = self.us.quantity(np.zeros((self._lattice.Q, self._y, self._x), dtype=np.float64), "kg/m**3")
 		self.feq = self.us.quantity(np.zeros((self._lattice.Q, self._y, self._x), dtype=np.float64), "kg/m**3")
 		self.fcoll = self.us.quantity(np.zeros((self._lattice.Q, self._y, self._x), dtype=np.float64), "kg/m**3")
-		self.u = self.us.quantity(np.zeros((self._lattice.D, self._y, self._x), dtype=np.float64), "m/s")
+		self.u = self.us.quantity(np.zeros((self._y, self._x, self._lattice.D), dtype=np.float64), "m/s")
 		self.density = self.us.quantity(np.zeros((self._y, self._x), dtype=np.float64), "kg/m**3")
 
 	def update_moments(self) -> None:
@@ -306,8 +311,8 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		self.density = self.f.sum(axis=0)
 
 		# TODO: make work for arbitrary lattice dimensions
-		self.us.magnitude(self.u)[0] = self.lattice.q * np.sum(self.lattice.dir_x[:, None, None] * self.f, axis=0) / self.density
-		self.us.magnitude(self.u)[1] = self.lattice.q * np.sum(self.lattice.dir_y[:, None, None] * self.f, axis=0) / self.density
+		self.us.magnitude(self.u)[:, :, 0] = self.lattice.q * np.sum(self.lattice.dir_x[:, None, None] * self.f, axis=0) / self.density
+		self.us.magnitude(self.u)[:, :, 1] = self.lattice.q * np.sum(self.lattice.dir_y[:, None, None] * self.f, axis=0) / self.density
 
 	def update_feq(self) -> None:
 		"""Compute equilibrium distribution functions.
@@ -322,9 +327,9 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		vel_x = self.lattice.dir_x * self.lattice.q
 		vel_y = self.lattice.dir_y * self.lattice.q
 		ws = self.lattice.weights
-		u_sq = cs_n2 / 2.0 * (self.u[0] ** 2 + self.u[1] ** 2)
+		u_sq = cs_n2 / 2.0 * (self.u[:, :, 0] ** 2 + self.u[:, :, 1] ** 2)
 		for i in range(self.lattice.Q):
-			lin_term = cs_n2 * (vel_x[i] * self.u[0] + vel_y[i] * self.u[1])
+			lin_term = cs_n2 * (vel_x[i] * self.u[:, :, 0] + vel_y[i] * self.u[:, :, 1])
 			self.feq[i] = ws[i] * self.density * (1 + lin_term + lin_term**2 / 2.0 - u_sq)
 
 	def stream(self) -> None:
@@ -378,18 +383,18 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		cmap = cm.get_cmap("viridis")
 		density_rgba = cmap(self.density)
 
-		fluid_vel_abs = np.sqrt(self.u[0] ** 2 + self.u[1] ** 2)
+		fluid_vel_abs = np.sqrt(self.u[:, :, 0] ** 2 + self.u[:, :, 1] ** 2)
 		fluid_vel_rgba = cmap(fluid_vel_abs)
 
 		overlay = np.array([1, 0, 0, 0.5])
-		mask = self.solid == 1
+#		mask = self.boundary.geometry == 1
 
 		dump_data = {"density": density_rgba, "fluid_velocity": fluid_vel_rgba}
 
 		for name, rgba in dump_data.items():
 			for i in range(3):
 				rgba = dump_data[name]
-				rgba[mask, i] = overlay[3] * overlay[i] + (1 - overlay[3]) * rgba[mask, i]
+#				rgba[mask, i] = overlay[3] * overlay[i] + (1 - overlay[3]) * rgba[mask, i]
 			plt_img.imsave(dump_dir_p / f"{name}_{self._runs}.png", rgba, dpi=600)
 
 		if isinstance(self.us.mode, Dimensional):

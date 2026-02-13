@@ -33,6 +33,7 @@ class Scenario(ABC):
 		self._lbm.init_sim_params()
 		self.define_scenario(self._lbm)
 		self._lbm.initialize_distribution_function()
+		self._lbm.boundary.setup()
 
 	# TODO: Make init wrapped / decorated
 	@abstractmethod
@@ -43,8 +44,13 @@ class Scenario(ABC):
 	def define_scenario(self, lbm: LBM) -> None:
 		pass
 
+	@abstractmethod
+	def post_run(self, lbm: LBM) -> None:
+		pass
+
 	def run(self, runs: int, dump_period: int, dump_dir: pathlib.Path) -> None:
 		self._lbm.run(runs, dump_period, dump_dir)
+		self.post_run(self._lbm)
 
 	# Factory functionality for creating properly typed LBM
 	@overload

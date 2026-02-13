@@ -1,6 +1,4 @@
-import argparse
 from pathlib import Path
-from typing import List, Tuple
 
 import numpy as np
 import pint
@@ -160,7 +158,7 @@ class WallDetector:
 
 		return segments
 
-	def _merge_periodic_segments(self, segments: list[tuple[int, int, int]], max_coord: int, direction: str) -> list[tuple[int, int, int]]:  # noqa: E101
+	def _merge_periodic_segments(self, segments: list[tuple[int, int, int]], max_coord: int, direction: str) -> list[tuple[int, int, int]]:
 		"""Merge segments that touch opposite edges (periodic boundary)."""
 		if len(segments) < 2:
 			return segments
