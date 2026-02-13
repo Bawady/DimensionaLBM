@@ -25,7 +25,7 @@ class Couette(Scenario):
 		lbm.solid[0, :] = 1
 		lbm.solid[-1, :] = 1
 
-		lbm.rho *= lbm.us.quantity(1, "kg/m**3")
+		lbm.density[:, :] = lbm.us.quantity(1, "kg/m**3")
 
 		boundary = ZouHe(lbm.lattice)
 		boundary.setup(lbm.solid)

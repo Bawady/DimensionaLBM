@@ -45,7 +45,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		fcoll (VectorT): Post-collision distribution functions, shape (Q, y, x).
 		feq (VectorT): Equilibrium distribution functions, shape (Q, y, x).
 		u (VectorT): Macroscopic velocity field, shape (D, y, x).
-		rho (VectorT): Macroscopic density field, shape (y, x).
+		density (VectorT): Macroscopic density field, shape (y, x).
 		us (UnitSystem[ModeT]): Unit system for handling dimensional quantities.
 		characteristic_quantities (ClassVar): List of characteristic quantities for
 			non-dimensionalization.
@@ -69,7 +69,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 	fcoll: VectorT
 	feq: VectorT
 	u: VectorT
-	rho: VectorT
+	density: VectorT
 
 	us: UnitSystem[ModeT]
 
@@ -188,7 +188,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 			- Any scenario-specific parameters
 
 		This method is called after setup() and __init_sim_params(), so all arrays
-		(f, feq, u, rho, solid) are already allocated and available for initialization.
+		(f, feq, u, density, solid) are already allocated and available for initialization.
 		"""
 		pass
 
@@ -219,7 +219,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		"""Execute a single LBM time step.
 
 		Performs the complete LBM cycle:
-			1. Update macroscopic moments (rho, u) from distribution functions
+			1. Update macroscopic moments (density, u) from distribution functions
 			2. Compute equilibrium distribution functions
 			3. Perform BGK collision
 			4. Stream distribution functions to neighbors
@@ -230,14 +230,14 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		self.update_feq()
 		self.collide()
 		self.stream()
-		self._boundary.apply_boundaries(self.f, self.rho, self.u)
+		self._boundary.apply_boundaries(self.f, self.density, self.u)
 		self._runs += 1
 
 	def initialize_distribution_function(self) -> None:
 		"""Initialize distribution functions to equilibrium.
 
 		Computes the equilibrium distribution based on the current macroscopic
-		fields (rho, u) and sets f = f_eq as the initial condition.
+		fields (density, u) and sets f = f_eq as the initial condition.
 		"""
 		self.update_feq()
 		self.f = self.feq.copy()
@@ -270,7 +270,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 			- Computes grid dimensions from physical dimensions and spacing
 			- Allocates the solid mask array
 			- Allocates distribution function arrays (f, feq, fcoll)
-			- Allocates macroscopic field arrays (u, rho)
+			- Allocates macroscopic field arrays (u, density)
 
 		Raises:
 			ValueError: If any required parameter is not set.
@@ -291,30 +291,30 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		self.feq = self.us.quantity(np.zeros((self._lattice.Q, self._y, self._x), dtype=np.float64), "kg/m**3")
 		self.fcoll = self.us.quantity(np.zeros((self._lattice.Q, self._y, self._x), dtype=np.float64), "kg/m**3")
 		self.u = self.us.quantity(np.zeros((self._lattice.D, self._y, self._x), dtype=np.float64), "m/s")
-		self.rho = self.us.quantity(np.zeros((self._y, self._x), dtype=np.float64), "1")
+		self.density = self.us.quantity(np.zeros((self._y, self._x), dtype=np.float64), "kg/m**3")
 
 	def update_moments(self) -> None:
 		"""Compute macroscopic moments from distribution functions.
 
-		Calculates the density (rho) and velocity (u) fields from the
+		Calculates the density (density) and velocity (u) fields from the
 		distribution functions using:
-			rho = sum_i(f_i)
-			u = (1/rho) * sum_i(f_i * c_i)
+			density = sum_i(f_i)
+			u = (1/density) * sum_i(f_i * c_i)
 
 		where c_i are the lattice velocity vectors.
 		"""
-		self.rho = self.f.sum(axis=0)
+		self.density = self.f.sum(axis=0)
 
 		# TODO: make work for arbitrary lattice dimensions
-		self.us.magnitude(self.u)[0] = self.lattice.q * np.sum(self.lattice.dir_x[:, None, None] * self.f, axis=0) / self.rho
-		self.us.magnitude(self.u)[1] = self.lattice.q * np.sum(self.lattice.dir_y[:, None, None] * self.f, axis=0) / self.rho
+		self.us.magnitude(self.u)[0] = self.lattice.q * np.sum(self.lattice.dir_x[:, None, None] * self.f, axis=0) / self.density
+		self.us.magnitude(self.u)[1] = self.lattice.q * np.sum(self.lattice.dir_y[:, None, None] * self.f, axis=0) / self.density
 
 	def update_feq(self) -> None:
 		"""Compute equilibrium distribution functions.
 
 		Calculates the Maxwell-Boltzmann equilibrium distribution expanded
 		to second order in velocity:
-			f_eq_i = w_i * rho * (1 + (c_i . u)/cs^2 + (c_i . u)^2/(2*cs^4) - u^2/(2*cs^2))
+			f_eq_i = w_i * density * (1 + (c_i . u)/cs^2 + (c_i . u)^2/(2*cs^4) - u^2/(2*cs^2))
 
 		where w_i are the lattice weights and cs is the speed of sound.
 		"""
@@ -325,7 +325,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		u_sq = cs_n2 / 2.0 * (self.u[0] ** 2 + self.u[1] ** 2)
 		for i in range(self.lattice.Q):
 			lin_term = cs_n2 * (vel_x[i] * self.u[0] + vel_y[i] * self.u[1])
-			self.feq[i] = ws[i] * self.rho * (1 + lin_term + lin_term**2 / 2.0 - u_sq)
+			self.feq[i] = ws[i] * self.density * (1 + lin_term + lin_term**2 / 2.0 - u_sq)
 
 	def stream(self) -> None:
 		"""Stream distribution functions to neighboring nodes.
@@ -376,7 +376,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		dump_dir_p.mkdir(exist_ok=True)
 
 		cmap = cm.get_cmap("viridis")
-		density_rgba = cmap(self.rho)
+		density_rgba = cmap(self.density)
 
 		fluid_vel_abs = np.sqrt(self.u[0] ** 2 + self.u[1] ** 2)
 		fluid_vel_rgba = cmap(fluid_vel_abs)
@@ -393,7 +393,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 			plt_img.imsave(dump_dir_p / f"{name}_{self._runs}.png", rgba, dpi=600)
 
 		if isinstance(self.us.mode, Dimensional):
-			assert self.rho.dimensionality == self.us.quantity(1, "kg/m**3").dimensionality
+			assert self.density.dimensionality == self.us.quantity(1, "kg/m**3").dimensionality
 			assert self.u.dimensionality == self.us.quantity(1, "m/s").dimensionality
 
 	def _set_unit_system(self, us: UnitSystem[ModeT]) -> None:
