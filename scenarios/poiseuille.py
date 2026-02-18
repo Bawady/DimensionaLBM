@@ -33,7 +33,7 @@ class Poiseuille(Scenario):
 		lbm.boundary.geometry = load_geometry("pipe.png")
 
 		max_speed = lbm.us.quantity(0.8, "m/s")
-		for y in range(1, lbm.y-1):
+		for y in range(lbm.y-1):
 			# Poiseuille source velocity profile
 			lbm.boundary.velocity_profile[y, 0] = max_speed / (lbm.y - 1)**2 * y * (lbm.y-1-y) * np.array([1, 0])
 			# Poiseuille sink density profile
