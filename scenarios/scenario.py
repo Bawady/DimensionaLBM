@@ -44,7 +44,6 @@ class Scenario(ABC):
 	def define_scenario(self, lbm: LBM) -> None:
 		pass
 
-	@abstractmethod
 	def post_run(self, lbm: LBM) -> None:
 		pass
 
