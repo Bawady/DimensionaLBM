@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import Enum, auto
+import math
 from typing import TYPE_CHECKING, Generic
 
 import numpy as np
@@ -27,7 +28,7 @@ class _ZouHeBoundary(ABC, Generic[ScalarT, VectorT]):
 	"""Abstract base class for individual Zou-He boundary segments."""
 
 	@abstractmethod
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT) -> None:
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step:int) -> None:
 		pass
 
 	@abstractmethod
@@ -45,7 +46,7 @@ class _BottomWall(_ZouHeBoundary[ScalarT, VectorT]):
 		self.velocity_profile = velocity_profile
 		self.density_profile = density_profile
 
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT) -> None:
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step:int) -> None:
 		y, x0, x1, q = self._y, self._x0, self._x1, self._q
 		velocity_profile = self.velocity_profile
 		density_profile = self.density_profile
@@ -90,7 +91,7 @@ class _TopWall(_ZouHeBoundary[ScalarT, VectorT]):
 		self.velocity_profile = velocity_profile
 		self.density_profile = density_profile
 
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT) -> None:
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT,step:int) -> None:
 		y, x0, x1, q = self._y, self._x0, self._x1, self._q
 		velocity_profile = self.velocity_profile
 		density_profile = self.density_profile
@@ -135,9 +136,9 @@ class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
 		self.velocity_profile = velocity_profile
 		self.density_profile = density_profile
 
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT) -> None:
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step:int) -> None:
 		x, y0, y1, q = self._x, self._y0, self._y1, self._q
-		velocity_profile = self.velocity_profile
+		velocity_profile = self.velocity_profile * (1 - math.exp(-step**2 / (2 * 10**5)))
 		density_profile = self.density_profile
 
 		if density_profile is None:
@@ -179,7 +180,7 @@ class _RightWall(_ZouHeBoundary[ScalarT, VectorT]):
 		self.velocity_profile = velocity_profile
 		self.density_profile = density_profile
 
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT) -> None:
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step:int) -> None:
 		x, y0, y1, q = self._x, self._y0, self._y1, self._q
 		velocity_profile = self.velocity_profile
 		density_profile = self.density_profile
@@ -215,10 +216,10 @@ class _RightWall(_ZouHeBoundary[ScalarT, VectorT]):
 
 
 _CONVEX_MAP: dict[_CornerOrientation, tuple[int, int]] = {
-	_CornerOrientation.TOP_RIGHT: (7, 8),
-	_CornerOrientation.BOT_RIGHT: (5, 6),
-	_CornerOrientation.TOP_LEFT: (6, 5),
-	_CornerOrientation.BOT_LEFT: (8, 7),
+	_CornerOrientation.TOP_LEFT: (5, 6),
+	_CornerOrientation.TOP_RIGHT: (8, 7),
+	_CornerOrientation.BOT_LEFT: (7, 8),
+	_CornerOrientation.BOT_RIGHT: (6, 5),
 }
 
 
@@ -230,7 +231,7 @@ class _ConvexCorner(_ZouHeBoundary[ScalarT, VectorT]):
 		self._dst = dst
 		self._src = src
 
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT) -> None:
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step:int) -> None:
 		f[self._dst, self._ys, self._xs] = f[self._src, self._ys, self._xs]
 
 	def defined_by(self, coordinates: tuple[int]) -> bool:
@@ -242,17 +243,19 @@ class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 		self._q = q
 		self._ys = ys
 		self._xs = xs
+		# Handlers named by old fluid-direction convention; mapping swapped
+		# to match position-based naming from WallDetector
 		self._apply_single = {
-			_CornerOrientation.BOT_LEFT: self._apply_bot_left,
-			_CornerOrientation.BOT_RIGHT: self._apply_bot_right,
-			_CornerOrientation.TOP_LEFT: self._apply_top_left,
-			_CornerOrientation.TOP_RIGHT: self._apply_top_right,
+			_CornerOrientation.TOP_LEFT: self._apply_bot_right,
+			_CornerOrientation.TOP_RIGHT: self._apply_bot_left,
+			_CornerOrientation.BOT_LEFT: self._apply_top_right,
+			_CornerOrientation.BOT_RIGHT: self._apply_top_left,
 		}[orientation]
 
 	def defined_by(self, coordinates: tuple[int]) -> bool:
 		return False
 
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT) -> None:
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step: int) -> None:
 		for i in range(len(self._ys)):
 			self._apply_single(f, rho, u, self._ys[i], self._xs[i])
 
@@ -319,10 +322,13 @@ class ZouHe(Boundary[ScalarT, VectorT]):
 	velocity_profile: VectorT
 	density_profile: VectorT
 	geometry: np.ndarray
+	step: int
 
 	def __init__(self, lbm: LBM) -> None:
 		super().__init__(lbm)
 		self._lattice = lbm.lattice
+
+		self.step = 0
 
 		self._boundaries = []
 		self.velocity_profile = lbm.us.quantity(np.zeros((lbm.y, lbm.x, lbm.lattice.D)), "m/s")
@@ -393,4 +399,5 @@ class ZouHe(Boundary[ScalarT, VectorT]):
 
 	def apply_boundaries(self, f: VectorT, rho: VectorT, u: VectorT) -> None:
 		for boundary in self._boundaries:
-			boundary.apply(f, rho, u)
+			boundary.apply(f, rho, u, self.step)
+		self.step += 1

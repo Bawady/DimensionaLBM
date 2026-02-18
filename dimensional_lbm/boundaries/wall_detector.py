@@ -12,8 +12,10 @@ class WallDetector:
 	Uses periodic boundary conditions for walls intersecting image edges, except
 	at image corners where both horizontal and vertical walls meet.
 
-	Walls are named by position: wall_l / left_walls are walls on the LEFT side
-	of the domain (with fluid to the right), etc.
+	Walls and convex corners are named by position: wall_l / left_walls are walls
+	on the LEFT side (fluid to the right), conv_tl is a convex corner at the
+	top-left (fluid to the bottom-right), etc. Concave corners are also named by
+	position (the direction where the two walls meet).
 	"""
 
 	def __init__(self):
@@ -115,14 +117,18 @@ class WallDetector:
 		_conc_br = solid & n["b"] & n["r"] & ~n["br"]
 
 		# Store corner positions
-		self.conv_tl = np.vstack(np.where(_conv_tl))
-		self.conv_tr = np.vstack(np.where(_conv_tr))
-		self.conv_bl = np.vstack(np.where(_conv_bl))
-		self.conv_br = np.vstack(np.where(_conv_br))
-		self.conc_tl = np.vstack(np.where(_conc_tl))
-		self.conc_tr = np.vstack(np.where(_conc_tr))
-		self.conc_bl = np.vstack(np.where(_conc_bl))
-		self.conc_br = np.vstack(np.where(_conc_br))
+		# Convex corners named by position (opposite of fluid direction):
+		# conv_tl = corner at top-left (fluid is to bottom-right)
+		self.conv_tl = np.vstack(np.where(_conv_br))
+		self.conv_tr = np.vstack(np.where(_conv_bl))
+		self.conv_bl = np.vstack(np.where(_conv_tr))
+		self.conv_br = np.vstack(np.where(_conv_tl))
+		# Concave corners named by position (opposite of fluid direction):
+		# conc_tl = corner at top-left (fluid pocket at bottom-right diagonal)
+		self.conc_tl = np.vstack(np.where(_conc_br))
+		self.conc_tr = np.vstack(np.where(_conc_bl))
+		self.conc_bl = np.vstack(np.where(_conc_tr))
+		self.conc_br = np.vstack(np.where(_conc_tl))
 
 		# All corners mask
 		corners = _conv_tl | _conv_tr | _conv_bl | _conv_br
