@@ -24,6 +24,8 @@ class Couette(Scenario):
 	def define_scenario(self, lbm: LBM) -> None:
 		lbm.density[:, :] = lbm.us.quantity(1, "kg/m**3")
 
+		lbm.stream = lbm.stream_periodic
+
 		lbm.boundary = ZouHe(lbm)
 
 		max_speed = lbm.lattice.q

@@ -339,6 +339,9 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		their respective lattice velocity directions using periodic boundary
 		conditions. The result is stored in f.
 		"""
+		self.lattice.stream(self.f, self.fcoll)
+
+	def stream_periodic(self) -> None:
 		self.lattice.stream_periodic(self.f, self.fcoll)
 
 	def collide(self) -> None:
