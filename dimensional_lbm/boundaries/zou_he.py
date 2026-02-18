@@ -330,9 +330,12 @@ class ZouHe(Boundary[ScalarT, VectorT]):
 		self.geometry = np.zeros((lbm.y, lbm.x))
 
 	def setup(self) -> None:
-		vel_detector = WallDetector()
 		velocity_geometry = np.where(np.linalg.norm(self.velocity_profile, axis=2) > 0, 1, 0)
-		vel_detector.detect(velocity_geometry)
+		density_geometry = np.where(self.density_profile > 0, 1, 0)
+		plain_geometry = np.where((self.geometry > 0) & (velocity_geometry == 0) & (density_geometry == 0), 1, 0)
+
+		vel_detector = WallDetector()
+		vel_detector.detect(velocity_geometry, other_boundaries=plain_geometry | density_geometry)
 
 		for y, x_start, x_end in vel_detector.bot_walls:
 			self._boundaries.append(_BottomWall(self._lattice.q, y, x_start, x_end + 1, velocity_profile=self.velocity_profile[y, x_start:x_end+1]))
@@ -340,24 +343,23 @@ class ZouHe(Boundary[ScalarT, VectorT]):
 			self._boundaries.append(_TopWall(self._lattice.q, y, x_start, x_end + 1, velocity_profile=self.velocity_profile[y, x_start:x_end+1]))
 		for x, y_start, y_end in vel_detector.left_walls:
 			self._boundaries.append(_LeftWall(self._lattice.q, x, y_start, y_end + 1, velocity_profile=self.velocity_profile[y_start:y_end+1, x]))
-#		for x, y_start, y_end in vel_detector.right_walls:
-#			self._boundaries.append(_RightWall(self._lattice.q, x, y_start, y_end + 1, velocity_profile=self.velocity_profile[y_start:y_end+1, x]))
+		for x, y_start, y_end in vel_detector.right_walls:
+			self._boundaries.append(_RightWall(self._lattice.q, x, y_start, y_end + 1, velocity_profile=self.velocity_profile[y_start:y_end+1, x]))
 
 		dens_detector = WallDetector()
-		density_geometry = np.where(self.density_profile > 0, 1, 0)
-		dens_detector.detect(density_geometry)
+		dens_detector.detect(density_geometry, other_boundaries=plain_geometry | velocity_geometry)
 
 		for y, x_start, x_end in dens_detector.bot_walls:
 			self._boundaries.append(_BottomWall(self._lattice.q, y, x_start, x_end + 1, density_profile=self.density_profile[y, x_start:x_end+1]))
 		for y, x_start, x_end in dens_detector.top_walls:
 			self._boundaries.append(_TopWall(self._lattice.q, y, x_start, x_end + 1, density_profile=self.density_profile[y, x_start:x_end+1]))
-#		for x, y_start, y_end in dens_detector.left_walls:
-#			self._boundaries.append(_LeftWall(self._lattice.q, x, y_start, y_end + 1, density_profile=self.density_profile[y_start:y_end+1, x]))
+		for x, y_start, y_end in dens_detector.left_walls:
+			self._boundaries.append(_LeftWall(self._lattice.q, x, y_start, y_end + 1, density_profile=self.density_profile[y_start:y_end+1, x]))
 		for x, y_start, y_end in dens_detector.right_walls:
 			self._boundaries.append(_RightWall(self._lattice.q, x, y_start, y_end + 1, density_profile=self.density_profile[y_start:y_end+1, x]))
 
 		detector = WallDetector()
-		detector.detect(self.geometry * (1-velocity_geometry) * (1-density_geometry))
+		detector.detect(plain_geometry, other_boundaries=velocity_geometry | density_geometry)
 
 		# Wall segments (detector end coordinates are inclusive, slicing needs exclusive)
 		for y, x_start, x_end in detector.bot_walls:

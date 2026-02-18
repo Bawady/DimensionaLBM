@@ -11,6 +11,9 @@ class WallDetector:
 	Solid cells are 1, fluid cells are 0. Boundaries are solid cells adjacent to fluid.
 	Uses periodic boundary conditions for walls intersecting image edges, except
 	at image corners where both horizontal and vertical walls meet.
+
+	Walls are named by position: wall_l / left_walls are walls on the LEFT side
+	of the domain (with fluid to the right), etc.
 	"""
 
 	def __init__(self):
@@ -65,13 +68,31 @@ class WallDetector:
 
 		return {"l": left, "r": right, "t": top, "b": bot, "tl": tl, "tr": tr, "bl": bl, "br": br}
 
-	def detect(self, solid: np.ndarray) -> None:
+	def detect(self, solid: np.ndarray, other_boundaries: np.ndarray | None = None) -> None:
+		"""Detect walls and corners in a solid/fluid array.
+
+		Args:
+			solid: The boundary cells to detect (1=boundary, 0=fluid).
+			other_boundaries: Optional mask of cells belonging to other boundary
+				types. These are treated as solid for neighbor lookups (preventing
+				false corners at junctions between boundary types) but are not
+				themselves detected as walls or corners.
+		"""
 		if isinstance(solid, pint.Quantity):
 			solid = solid.magnitude
 
 		solid = solid.astype(np.int32)
 		self._height, self._width = solid.shape
-		n = self._get_neighbors(solid)
+
+		if other_boundaries is not None:
+			if isinstance(other_boundaries, pint.Quantity):
+				other_boundaries = other_boundaries.magnitude
+			other_boundaries = other_boundaries.astype(np.int32)
+			combined = solid | other_boundaries
+		else:
+			combined = solid
+
+		n = self._get_neighbors(combined)
 
 		# Fluid neighbors (where there's fluid adjacent to this cell)
 		fluid_l = solid & ~n["l"]  # solid here, fluid to left
@@ -108,15 +129,16 @@ class WallDetector:
 		corners |= _conc_tl | _conc_tr | _conc_bl | _conc_br
 
 		# Straight walls: fluid in one direction, not a corner
-		_wall_l = fluid_l & ~corners
-		_wall_r = fluid_r & ~corners
-		_wall_t = fluid_t & ~corners
-		_wall_b = fluid_b & ~corners
+		_fluid_to_l = fluid_l & ~corners
+		_fluid_to_r = fluid_r & ~corners
+		_fluid_to_t = fluid_t & ~corners
+		_fluid_to_b = fluid_b & ~corners
 
-		self.wall_l = np.vstack(np.where(_wall_l))
-		self.wall_r = np.vstack(np.where(_wall_r))
-		self.wall_t = np.vstack(np.where(_wall_t))
-		self.wall_b = np.vstack(np.where(_wall_b))
+		# Walls named by position: wall_l = wall on the left side (fluid to right)
+		self.wall_l = np.vstack(np.where(_fluid_to_r))
+		self.wall_r = np.vstack(np.where(_fluid_to_l))
+		self.wall_t = np.vstack(np.where(_fluid_to_b))
+		self.wall_b = np.vstack(np.where(_fluid_to_t))
 
 		# Segment walls with periodic handling
 		self.left_walls = self._segment_walls_periodic(self.wall_l, "y", self._height)
