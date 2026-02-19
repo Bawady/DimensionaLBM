@@ -31,10 +31,6 @@ class _ZouHeBoundary(ABC, Generic[ScalarT, VectorT]):
 	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step:int) -> None:
 		pass
 
-	@abstractmethod
-	def defined_by(self, coordinates: tuple[int]) -> bool:
-		"""Returns true if a boundary's position is defined by the given coordinates."""
-		pass
 
 
 class _BottomWall(_ZouHeBoundary[ScalarT, VectorT]):
@@ -78,9 +74,6 @@ class _BottomWall(_ZouHeBoundary[ScalarT, VectorT]):
 		# up-right
 		f[7, y, x0:x1] = f[8, y, x0:x1] - 0.5 * (f[1, y, x0:x1] - f[2, y, x0:x1]) + wall_dens / q * (0.5 * vel_x - 1 / 6.0 * vel_y)
 
-	def defined_by(self, coordinates: tuple[int]) -> bool:
-		return len(coordinates) == 3 and self._y == coordinates[0] and self._x0 == coordinates[1] and self._x1 == coordinates[2]
-
 
 class _TopWall(_ZouHeBoundary[ScalarT, VectorT]):
 	def __init__(self, q: ScalarT, y: int, x0: int, x1: int, velocity_profile: VectorT | None = None, density_profile: VectorT | None = None) -> None:
@@ -123,9 +116,6 @@ class _TopWall(_ZouHeBoundary[ScalarT, VectorT]):
 		# down-left
 		f[8, y, x0:x1] = f[7, y, x0:x1] + 0.5 * (f[1, y, x0:x1] - f[2, y, x0:x1]) + wall_dens / q * (-0.5 * vel_x + 1 / 6.0 * vel_y)
 
-	def defined_by(self, coordinates: tuple[int]) -> bool:
-		return len(coordinates) == 3 and self._y == coordinates[0] and self._x0 == coordinates[1] and self._x1 == coordinates[2]
-
 
 class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
 	def __init__(self, q: ScalarT, x: int, y0: int, y1: int, velocity_profile: VectorT | None = None, density_profile: VectorT | None = None) -> None:
@@ -138,14 +128,14 @@ class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
 
 	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step:int) -> None:
 		x, y0, y1, q = self._x, self._y0, self._y1, self._q
-		velocity_profile = self.velocity_profile * (1 - math.exp(-step**2 / (2 * 10**5)))
+		velocity_profile = self.velocity_profile
 		density_profile = self.density_profile
 
 		if density_profile is None:
 			scale = q / (q - u[y0:y1, x, 0])
 			rho[y0:y1, x] = scale * (f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[2, y0:y1, x] + f[6, y0:y1, x] + f[8, y0:y1, x]))
 			if velocity_profile is not None:
-				u[y0:y1, x] = velocity_profile
+				u[y0:y1, x] = velocity_profile * (1 - math.exp(-step**2 / (2 * 800)))
 			else:
 				u[y0:y1, x] *= 0
 		elif velocity_profile is None:
@@ -167,9 +157,6 @@ class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
 		# up-right
 		f[7, y0:y1, x] = f[8, y0:y1, x] + 0.5 * (f[4, y0:y1, x] - f[3, y0:y1, x]) + wall_dens / q * (1 / 6.0 * vel_x - 0.5 * vel_y)
 
-	def defined_by(self, coordinates: tuple[int]) -> bool:
-		return len(coordinates) == 3 and self._x == coordinates[0] and self._y0 == coordinates[1] and self._y1 == coordinates[2]
-
 
 class _RightWall(_ZouHeBoundary[ScalarT, VectorT]):
 	def __init__(self, q: ScalarT, x: int, y0: int, y1: int, velocity_profile: VectorT | None = None, density_profile: VectorT | None = None) -> None:
@@ -186,7 +173,7 @@ class _RightWall(_ZouHeBoundary[ScalarT, VectorT]):
 		density_profile = self.density_profile
 
 		if density_profile is None:
-			scale = q / (q + u[0, y0:y1, x])
+			scale = q / (q + u[y0:y1, x, 0])
 			rho[y0:y1, x] = scale * (f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[1, y0:y1, x] + f[5, y0:y1, x] + f[7, y0:y1, x]))
 			if velocity_profile is not None:
 				u[y0:y1, x] = velocity_profile
@@ -211,9 +198,6 @@ class _RightWall(_ZouHeBoundary[ScalarT, VectorT]):
 		# down-left
 		f[8, y0:y1, x] = f[7, y0:y1, x] - 0.5 * (f[4, y0:y1, x] - f[3, y0:y1, x]) + wall_dens / q * (-1 / 6.0 * vel_x + 0.5 * vel_y)
 
-	def defined_by(self, coordinates: tuple[int]) -> bool:
-		return len(coordinates) == 3 and self._x == coordinates[0] and self._y0 == coordinates[1] and self._y1 == coordinates[2]
-
 
 _CONVEX_MAP: dict[_CornerOrientation, tuple[int, int]] = {
 	_CornerOrientation.TOP_LEFT: (5, 6),
@@ -234,9 +218,6 @@ class _ConvexCorner(_ZouHeBoundary[ScalarT, VectorT]):
 	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step:int) -> None:
 		f[self._dst, self._ys, self._xs] = f[self._src, self._ys, self._xs]
 
-	def defined_by(self, coordinates: tuple[int]) -> bool:
-		return False
-
 
 class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 	def __init__(self, q: ScalarT, ys: ndarray, xs: ndarray, orientation: _CornerOrientation) -> None:
@@ -246,21 +227,17 @@ class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 		# Handlers named by old fluid-direction convention; mapping swapped
 		# to match position-based naming from WallDetector
 		self._apply_single = {
-			_CornerOrientation.TOP_LEFT: self._apply_bot_right,
-			_CornerOrientation.TOP_RIGHT: self._apply_bot_left,
-			_CornerOrientation.BOT_LEFT: self._apply_top_right,
-			_CornerOrientation.BOT_RIGHT: self._apply_top_left,
+			_CornerOrientation.TOP_LEFT: self._apply_top_left,
+			_CornerOrientation.TOP_RIGHT: self._apply_top_right,
+			_CornerOrientation.BOT_LEFT: self._apply_bot_left,
+			_CornerOrientation.BOT_RIGHT: self._apply_bot_right,
 		}[orientation]
-
-	def defined_by(self, coordinates: tuple[int]) -> bool:
-		return False
 
 	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step: int) -> None:
 		for i in range(len(self._ys)):
 			self._apply_single(f, rho, u, self._ys[i], self._xs[i])
 
 	def _apply_bot_left(self, f: VectorT, rho: VectorT, u: VectorT, y: int, x: int) -> None:
-		return
 		q = self._q
 		u[y, x, 0] = u[y, x + 1, 0]
 		u[y, x, 1] = u[ y - 1, x, 1]
@@ -274,7 +251,6 @@ class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 		f[0, y, x] = rho[y, x] - np.sum(f[1:9, y, x])
 
 	def _apply_bot_right(self, f: VectorT, rho: VectorT, u: VectorT, y: int, x: int) -> None:
-		return
 		q = self._q
 		u[y, x, 0] = u[y, x - 1, 0]
 		u[y, x, 1] = u[y - 1, x, 1]
@@ -288,7 +264,6 @@ class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 		f[0, y, x] = rho[y, x] - np.sum(f[1:9, y, x])
 
 	def _apply_top_left(self, f: VectorT, rho: VectorT, u: VectorT, y: int, x: int) -> None:
-		return
 		q = self._q
 		u[y, x, 0] = u[y, x + 1, 0]
 		u[y, x, 1] = u[y + 1, y, 1]
@@ -302,7 +277,6 @@ class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 		f[0, y, x] = rho[y, x] - np.sum(f[1:9, y, x])
 
 	def _apply_top_right(self, f: VectorT, rho: VectorT, u: VectorT, y: int, x: int) -> None:
-		return
 		q = self._q
 		u[y, x, 0] = u[y, x - 1, 0]
 		u[y, x, 1] = u[y + 1, x, 1]
