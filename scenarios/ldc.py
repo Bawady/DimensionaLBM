@@ -15,7 +15,7 @@ from scenarios.scenario import Scenario
 
 class LidDrivenCavity(Scenario):
 
-	def setup(self, lbm: LBM) -> None:
+	def define_scenario(self, lbm: LBM) -> None:
 		lbm.dx = lbm.us.quantity(1, "mm")
 		lbm.dt = lbm.us.quantity(1, "us")
 
@@ -26,8 +26,6 @@ class LidDrivenCavity(Scenario):
 
 		reynolds = 100
 		lbm.bgk_tau = lbm.viscosity_to_bgk_tau(lbm.us.quantity(250, "m/s") * lbm.width / reynolds)
-
-	def define_scenario(self, lbm: LBM) -> None:
 
 		initial_density = lbm.us.quantity(1, "kg/m**3")
 		lbm.density[:, :] = initial_density

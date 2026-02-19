@@ -30,15 +30,10 @@ class Scenario(ABC):
 		self._lbm = self._create(conversion_mode=mode)
 
 		self.setup(self._lbm)
-		self._lbm.init_sim_params()
 		self.define_scenario(self._lbm)
+		self._lbm.check_parameters_set()
 		self._lbm.initialize_distribution_function()
 		self._lbm.boundary.setup()
-
-	# TODO: Make init wrapped / decorated
-	@abstractmethod
-	def setup(self, lbm: LBM) -> None:
-		pass
 
 	@abstractmethod
 	def define_scenario(self, lbm: LBM) -> None:

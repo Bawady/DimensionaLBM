@@ -15,17 +15,15 @@ from scenarios.scenario import Scenario
 
 class Poiseuille(Scenario):
 
-	def setup(self, lbm: LBM) -> None:
-		lbm.dx = lbm.us.quantity(1, "m")
-		lbm.dt = lbm.us.quantity(1, "s")
-
+	def define_scenario(self, lbm: LBM) -> None:
 		lbm.width = lbm.us.quantity(80, "m")
 		lbm.height = lbm.us.quantity(20, "m")
 
+		lbm.dx = lbm.us.quantity(1, "m")
+		lbm.dt = lbm.us.quantity(1, "s")
+
 		lbm.lattice = D2Q9(lbm.dx, lbm.dt)
 		lbm.bgk_tau = lbm.viscosity_to_bgk_tau(lbm.us.quantity(0.026, "m**2/s"))
-
-	def define_scenario(self, lbm: LBM) -> None:
 
 		initial_density = lbm.us.quantity(1, "kg/m**3")
 		lbm.density[:, :] = initial_density

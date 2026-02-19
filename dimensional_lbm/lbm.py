@@ -103,9 +103,19 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		"""The lattice structure used for the simulation (e.g., D2Q5, D2Q9)."""
 		return self._lattice
 
+	def _init_lbm_fields(self) -> None:
+		self.f = self.us.quantity(np.zeros((self._lattice.Q, self._y, self._x), dtype=np.float64), "kg/m**3")
+		self.feq = self.us.quantity(np.zeros((self._lattice.Q, self._y, self._x), dtype=np.float64), "kg/m**3")
+		self.fcoll = self.us.quantity(np.zeros((self._lattice.Q, self._y, self._x), dtype=np.float64), "kg/m**3")
+		self.u = self.us.quantity(np.zeros((self._y, self._x, self._lattice.D), dtype=np.float64), "m/s")
+		self.density = self.us.quantity(np.zeros((self._y, self._x), dtype=np.float64), "kg/m**3")
+
 	@lattice.setter
 	def lattice(self, lattice: DdQqLattice) -> None:
 		self._lattice = lattice
+
+		if self._x > 0 and self._y > 0:
+			self._init_lbm_fields()
 
 	@property
 	def boundary(self) -> Boundary:
@@ -128,6 +138,15 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 	def dx(self, dx: ScalarT) -> None:
 		self._dx = dx
 
+		if hasattr(self ,"_width"):
+			self._set_lattice_width()
+
+		if hasattr(self ,"_height"):
+			self._set_lattice_height()
+
+		if hasattr(self ,"_width") and hasattr(self ,"_height") and hasattr(self, "_lattice"):
+			self._init_lbm_fields()
+
 	@property
 	def dt(self) -> ScalarT:
 		"""Time step (temporal discretization step)."""
@@ -142,9 +161,21 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		"""Width of the simulation lattice."""
 		return self._width
 
+	def _set_lattice_width(self) -> None:
+		self._x = int(self.us.magnitude(self._width / self._dx))
+
+	def _set_lattice_height(self) -> None:
+		self._y = int(self.us.magnitude(self._height / self._dx))
+
 	@width.setter
 	def width(self, width: ScalarT) -> None:
 		self._width = width
+
+		if hasattr(self, "_dx"):
+			self._set_lattice_width()
+
+			if hasattr(self, "height") and hasattr(self, "_lattice"):
+				self._init_lbm_fields()
 
 	@property
 	def height(self) -> ScalarT:
@@ -154,6 +185,12 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 	@height.setter
 	def height(self, height: ScalarT) -> None:
 		self._height = height
+
+		if hasattr(self, "_dx"):
+			self._set_lattice_height()
+
+			if hasattr(self, "width") and hasattr(self, "_lattice"):
+				self._init_lbm_fields()
 
 	@property
 	def bgk_tau(self) -> ScalarT:
@@ -215,7 +252,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		Raises:
 			ValueError: If the lattice has not been set (required for speed of sound).
 		"""
-		if not self.lattice:
+		if not hasattr(self, "lattice"):
 			msg: str = "Cannot compute the BGK relaxation time tau without the lattice having been declared prior - the speed of sound must be known."
 			raise ValueError(msg)
 		return self.dt / 2 + viscosity * self.lattice.cs_n2
@@ -267,7 +304,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 				self.dump(out_dir_p)
 			self._sim_step()
 
-	def init_sim_params(self) -> None:
+	def check_parameters_set(self) -> None:
 		"""Initialize simulation parameters and allocate arrays.
 
 		Validates that all required parameters (dx, dt, lattice, width, height)
@@ -284,19 +321,8 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 
 		for req_prop in required_properties:
 			if not getattr(self, req_prop):
-				msg: str = f"The property {req_prop[1:]} must be set within the scenario's setup method"
+				msg: str = f"The property {req_prop[1:]} must be set within the scenario's `define_scenario` method"
 				raise ValueError(msg)
-
-		self._x = int(self.us.magnitude(self._width / self._dx))
-		self._y = int(self.us.magnitude(self._height / self._dx))
-
-		self.solid = np.zeros((self._y, self._x), dtype=np.int32)
-
-		self.f = self.us.quantity(np.zeros((self._lattice.Q, self._y, self._x), dtype=np.float64), "kg/m**3")
-		self.feq = self.us.quantity(np.zeros((self._lattice.Q, self._y, self._x), dtype=np.float64), "kg/m**3")
-		self.fcoll = self.us.quantity(np.zeros((self._lattice.Q, self._y, self._x), dtype=np.float64), "kg/m**3")
-		self.u = self.us.quantity(np.zeros((self._y, self._x, self._lattice.D), dtype=np.float64), "m/s")
-		self.density = self.us.quantity(np.zeros((self._y, self._x), dtype=np.float64), "kg/m**3")
 
 	def update_moments(self) -> None:
 		"""Compute macroscopic moments from distribution functions.
