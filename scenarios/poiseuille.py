@@ -22,7 +22,7 @@ class Poiseuille(Scenario):
 		lbm.height = lbm.us.quantity(20, "m")
 
 		lbm.lattice = D2Q9(lbm.dx, lbm.dt)
-		lbm.bgk_tau = lbm.viscosity_to_bgk_tau(lbm.us.quantity(0.02, "m**2/s"))
+		lbm.bgk_tau = lbm.viscosity_to_bgk_tau(lbm.us.quantity(0.026, "m**2/s"))
 
 	def define_scenario(self, lbm: LBM) -> None:
 
@@ -45,7 +45,7 @@ class Poiseuille(Scenario):
 		data = lbm.u[:, lbm.x//2, 0] / lbm.us.quantity(0.2, "m/s")
 
 		plt.plot(ref, y_ind, label="ref")
-		plt.plot(data * np.max(ref) / np.max(data), y_ind, label="lbm", marker="o")
+		plt.plot(data, y_ind, label="lbm", marker="o")
 		plt.show()
 
 
@@ -53,4 +53,4 @@ if __name__ == "__main__":
 	characteristic_quantities: list[ScalarQuantityDefinition] = [(1, "m"), (1, "s"), (1, "kg/m**3")]
 
 	sim = Poiseuille(characteristic_quantities, conversion_mode=NonDimensional)
-	sim.run(50000, 1000, pathlib.Path("test/poiseuille"))
+	sim.run(5000, 100, pathlib.Path("test/poiseuille"))
