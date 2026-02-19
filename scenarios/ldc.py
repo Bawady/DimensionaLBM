@@ -37,7 +37,7 @@ class LidDrivenCavity(Scenario):
 		lbm.boundary.geometry[:, -1] = 1
 
 		max_speed = lbm.us.quantity(0.1, "m/s")
-		for x in range(1, lbm.x-1):
+		for x in range(lbm.x):
 			lbm.boundary.velocity_profile[0, x] = lambda step: max_speed * (1 - math.exp(-step**2 / (2 * 100))) * np.array([1, 0])
 			lbm.boundary.velocity_profile[-1, x] = lambda step: -max_speed * (1 - math.exp(-step**2 / (2 * 100))) * np.array([1, 0])
 
