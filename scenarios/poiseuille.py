@@ -1,3 +1,4 @@
+import math
 import pathlib
 
 import matplotlib.pyplot as plt
@@ -33,9 +34,10 @@ class Poiseuille(Scenario):
 		lbm.boundary.geometry = load_geometry("pipe.png")
 
 		max_speed = lbm.us.quantity(0.8, "m/s")
-		for y in range(lbm.y-1):
+		for y in range(lbm.y):
 			# Poiseuille source velocity profile
-			lbm.boundary.velocity_profile[y, 0] = max_speed / (lbm.y - 1)**2 * y * (lbm.y-1-y) * np.array([1, 0])
+			inlet_speed = max_speed / (lbm.y - 1)**2 * y * (lbm.y - 1 - y)
+			lbm.boundary.velocity_profile[y, 0] = lambda step, speed=inlet_speed: speed * (1 - math.exp(-step**2 / (2 * 800))) * np.array([1, 0])
 			# Poiseuille sink density profile
 			lbm.boundary.density_profile[y, -1] = initial_density
 

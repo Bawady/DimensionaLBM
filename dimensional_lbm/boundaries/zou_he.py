@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-import math
-from typing import TYPE_CHECKING, Generic
+from typing import TYPE_CHECKING, Any, Generic
 
 import numpy as np
 from numpy import ndarray
@@ -13,6 +12,8 @@ from dimensional_lbm.boundaries.wall_detector import WallDetector
 from dimensional_lbm.unit_system_if import ScalarT, VectorT
 
 if TYPE_CHECKING:
+	from collections.abc import Callable
+
 	from dimensional_lbm.lattices.ddqq_lattice import DdQqLattice
 	from dimensional_lbm.lbm import LBM
 
@@ -24,6 +25,69 @@ class _CornerOrientation(Enum):
 	TOP_RIGHT = auto()
 
 
+class _VelocityProfile(Generic[VectorT]):
+	_profile : VectorT
+	_callbacks : list[tuple[Any, Callable[int], VectorT]]
+	_last_step : int
+
+	def __init__(self, lbm: LBM) -> None:
+		self._profile = lbm.us.quantity(np.zeros((lbm.y, lbm.x, lbm.lattice.D)), "m/s")
+		self._callbacks = []
+		self._last_step = -1
+
+	def __setitem__(self, key: Any, value: VectorT | Callable[[int], VectorT]) -> None:
+		if callable(value):
+			self._callbacks.append((key, value))
+		else:
+			self._profile[key] = value
+
+	def get(self, step: int) -> VectorT:
+		if step > self._last_step:
+			for cb in self._callbacks:
+				self._profile[cb[0]] = cb[-1](step)
+			self._last_step = step
+		return self._profile
+
+	@property
+	def geometry(self) -> np.ndarray:
+		geometry = np.where(np.linalg.norm(self._profile, axis=-1) > 0, 1, 0)
+		for cb in self._callbacks:
+			geometry[cb[0]] = 1
+		return geometry
+
+
+class _DensityProfile(Generic[ScalarT, VectorT]):
+	_profile : VectorT
+	_callbacks : list[tuple[Any, Callable[int], ScalarT]]
+	_last_step : int
+
+	def __init__(self, lbm: LBM) -> None:
+		self._profile = lbm.us.quantity(np.zeros((lbm.y, lbm.x)), "kg/m**3")
+		self._callbacks = []
+		self._last_step = -1
+
+	def __setitem__(self, key: Any, value: VectorT | Callable[[int], ScalarT]) -> None:
+		if callable(value):
+			self._callbacks.append((key, value))
+		else:
+			self._profile[key] = value
+
+	def get(self, step: int) -> ScalarT:
+		if step > self._last_step:
+			for cb in self._callbacks:
+				self._profile[cb[0]] = cb[-1](step)
+			self._last_step = step
+		return self._profile
+
+	@property
+	def geometry(self) -> np.ndarray:
+		geometry = np.where(self._profile > 0, 1, 0)
+		for cb in self._callbacks:
+			geometry[cb[0]] = 1
+		return geometry
+
+
+
 class _ZouHeBoundary(ABC, Generic[ScalarT, VectorT]):
 	"""Abstract base class for individual Zou-He boundary segments."""
 
@@ -32,9 +96,8 @@ class _ZouHeBoundary(ABC, Generic[ScalarT, VectorT]):
 		pass
 
 
-
 class _BottomWall(_ZouHeBoundary[ScalarT, VectorT]):
-	def __init__(self, q: ScalarT, y: int, x0: int, x1: int, velocity_profile: VectorT | None = None, density_profile: VectorT | None = None) -> None:
+	def __init__(self, q: ScalarT, y: int, x0: int, x1: int, velocity_profile: _VelocityProfile | None = None, density_profile: _DensityProfile | None = None) -> None:
 		self._q = q
 		self._y = y
 		self._x0 = x0
@@ -51,14 +114,15 @@ class _BottomWall(_ZouHeBoundary[ScalarT, VectorT]):
 			scale = q / (q + u[y, x0:x1, 1])
 			rho[y, x0:x1] = scale * (f[0, y, x0:x1] + f[1, y, x0:x1] + f[2, y, x0:x1] + 2 * (f[4, y, x0:x1] + f[5, y, x0:x1] + f[8, y, x0:x1]))
 			if velocity_profile is not None:
-				u[y, x0:x1] = velocity_profile
+				u[y, x0:x1] = velocity_profile.get(step)[y, x0:x1]
 			else:
 				u[y, x0:x1] *= 0
 		elif velocity_profile is None:
-			rho[y, x0:x1] = density_profile
+			density = density_profile.get(step)[y, x0:x1]
+			rho[y, x0:x1] = density
 			u[y, x0:x1, 0] *= 0
 			u[y, x0:x1, 1] = q * (
-				(f[0, y, x0:x1] + f[1, y, x0:x1] + f[2, y, x0:x1] + 2 * (f[4, y, x0:x1] + f[5, y, x0:x1] + f[8, y, x0:x1])) / density_profile - 1
+				(f[0, y, x0:x1] + f[1, y, x0:x1] + f[2, y, x0:x1] + 2 * (f[4, y, x0:x1] + f[5, y, x0:x1] + f[8, y, x0:x1])) / density - 1
 			)
 		else:
 			msg: str = "Neither velocity nor density profile given"
@@ -76,7 +140,7 @@ class _BottomWall(_ZouHeBoundary[ScalarT, VectorT]):
 
 
 class _TopWall(_ZouHeBoundary[ScalarT, VectorT]):
-	def __init__(self, q: ScalarT, y: int, x0: int, x1: int, velocity_profile: VectorT | None = None, density_profile: VectorT | None = None) -> None:
+	def __init__(self, q: ScalarT, y: int, x0: int, x1: int, velocity_profile: _VelocityProfile | None = None, density_profile: _DensityProfile | None = None) -> None:
 		self._q = q
 		self._y = y
 		self._x0 = x0
@@ -93,14 +157,15 @@ class _TopWall(_ZouHeBoundary[ScalarT, VectorT]):
 			scale = q / (q - u[y, x0:x1, 1])
 			rho[y, x0:x1] = scale * (f[0, y, x0:x1] + f[1, y, x0:x1] + f[2, y, x0:x1] + 2 * (f[3, y, x0:x1] + f[6, y, x0:x1] + f[7, y, x0:x1]))
 			if velocity_profile is not None:
-				u[y, x0:x1] = velocity_profile
+				u[y, x0:x1] = velocity_profile.get(step)[y, x0:x1]
 			else:
 				u[y, x0:x1] *= 0
 		elif velocity_profile is None:
-			rho[y, x0:x1] = density_profile
+			density = density_profile.get(step)[y, x0:x1]
+			rho[y, x0:x1] = density
 			u[y, x0:x1, 0] = 0
 			u[y, x0:x1, 1] = q * (
-				1 - (f[0, y, x0:x1] + f[1, y, x0:x1] + f[2, y, x0:x1] + 2 * (f[3, y, x0:x1] + f[6, y, x0:x1] + f[7, y, x0:x1])) / density_profile
+				1 - (f[0, y, x0:x1] + f[1, y, x0:x1] + f[2, y, x0:x1] + 2 * (f[3, y, x0:x1] + f[6, y, x0:x1] + f[7, y, x0:x1])) / density
 			)
 		else:
 			msg: str = "Neither velocity nor density profile given"
@@ -118,7 +183,7 @@ class _TopWall(_ZouHeBoundary[ScalarT, VectorT]):
 
 
 class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
-	def __init__(self, q: ScalarT, x: int, y0: int, y1: int, velocity_profile: VectorT | None = None, density_profile: VectorT | None = None) -> None:
+	def __init__(self, q: ScalarT, x: int, y0: int, y1: int, velocity_profile: _VelocityProfile | None = None, density_profile: _DensityProfile | None = None) -> None:
 		self._q = q
 		self._x = x
 		self._y0 = y0
@@ -135,14 +200,15 @@ class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
 			scale = q / (q - u[y0:y1, x, 0])
 			rho[y0:y1, x] = scale * (f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[2, y0:y1, x] + f[6, y0:y1, x] + f[8, y0:y1, x]))
 			if velocity_profile is not None:
-				u[y0:y1, x] = velocity_profile * (1 - math.exp(-step**2 / (2 * 800)))
+				u[y0:y1, x] = velocity_profile.get(step)[y0:y1, x]
 			else:
 				u[y0:y1, x] *= 0
 		elif velocity_profile is None:
-			rho[y0:y1, x] = density_profile
+			density = density_profile.get(step)[y0:y1, x]
+			rho[y0:y1, x] = density
 			u[y0:y1, x, 1] = 0
 			u[y0:y1, x, 0] = q * (
-				1 - (f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[2, y0:y1, x] + f[6, y0:y1, x] + f[8, y0:y1, x])) / density_profile
+				1 - (f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[2, y0:y1, x] + f[6, y0:y1, x] + f[8, y0:y1, x])) / density
 			)
 		else:
 			raise ValueError("Neither velocity nor density profile given")
@@ -159,7 +225,7 @@ class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
 
 
 class _RightWall(_ZouHeBoundary[ScalarT, VectorT]):
-	def __init__(self, q: ScalarT, x: int, y0: int, y1: int, velocity_profile: VectorT | None = None, density_profile: VectorT | None = None) -> None:
+	def __init__(self, q: ScalarT, x: int, y0: int, y1: int, velocity_profile: _VelocityProfile | None = None, density_profile: _DensityProfile | None = None) -> None:
 		self._q = q
 		self._x = x
 		self._y0 = y0
@@ -176,14 +242,15 @@ class _RightWall(_ZouHeBoundary[ScalarT, VectorT]):
 			scale = q / (q + u[y0:y1, x, 0])
 			rho[y0:y1, x] = scale * (f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[1, y0:y1, x] + f[5, y0:y1, x] + f[7, y0:y1, x]))
 			if velocity_profile is not None:
-				u[y0:y1, x] = velocity_profile
+				u[y0:y1, x] = velocity_profile.get(step)[y0:y1, x]
 			else:
 				u[y0:y1, x] *= 0
 		elif velocity_profile is None:
-			rho[y0:y1, x] = density_profile
+			density = density_profile.get(step)[y0:y1, x]
+			rho[y0:y1, x] = density
 			u[y0:y1, x, 1] *= 0
 			u[y0:y1, x, 0] = q * (
-				(f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[1, y0:y1, x] + f[5, y0:y1, x] + f[7, y0:y1, x])) / density_profile - 1
+				(f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[1, y0:y1, x] + f[5, y0:y1, x] + f[7, y0:y1, x])) / density - 1
 			)
 		else:
 			raise ValueError("Neither velocity nor density profile given")
@@ -290,11 +357,13 @@ class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 		f[0, y, x] = rho[y, x] - np.sum(f[1:9, y, x])
 
 
+
+
 class ZouHe(Boundary[ScalarT, VectorT]):
 	_boundaries: list[_ZouHeBoundary]
 	_lattice: DdQqLattice
-	velocity_profile: VectorT
-	density_profile: VectorT
+	velocity_profile: _VelocityProfile[VectorT]
+	density_profile: _DensityProfile[ScalarT, VectorT]
 	geometry: np.ndarray
 	step: int
 
@@ -305,38 +374,38 @@ class ZouHe(Boundary[ScalarT, VectorT]):
 		self.step = 0
 
 		self._boundaries = []
-		self.velocity_profile = lbm.us.quantity(np.zeros((lbm.y, lbm.x, lbm.lattice.D)), "m/s")
-		self.density_profile = lbm.us.quantity(np.zeros((lbm.y, lbm.x)), "kg/m**3")
+		self.velocity_profile = _VelocityProfile(lbm)
+		self.density_profile = _DensityProfile(lbm)
 		self.geometry = np.zeros((lbm.y, lbm.x))
 
 	def setup(self) -> None:
-		velocity_geometry = np.where(np.linalg.norm(self.velocity_profile, axis=2) > 0, 1, 0)
-		density_geometry = np.where(self.density_profile > 0, 1, 0)
+		velocity_geometry = self.velocity_profile.geometry
+		density_geometry = self.density_profile.geometry
 		plain_geometry = np.where((self.geometry > 0) & (velocity_geometry == 0) & (density_geometry == 0), 1, 0)
 
 		vel_detector = WallDetector()
 		vel_detector.detect(velocity_geometry, other_boundaries=plain_geometry | density_geometry)
 
 		for y, x_start, x_end in vel_detector.bot_walls:
-			self._boundaries.append(_BottomWall(self._lattice.q, y, x_start, x_end + 1, velocity_profile=self.velocity_profile[y, x_start:x_end+1]))
+			self._boundaries.append(_BottomWall(self._lattice.q, y, x_start, x_end + 1, velocity_profile=self.velocity_profile))
 		for y, x_start, x_end in vel_detector.top_walls:
-			self._boundaries.append(_TopWall(self._lattice.q, y, x_start, x_end + 1, velocity_profile=self.velocity_profile[y, x_start:x_end+1]))
+			self._boundaries.append(_TopWall(self._lattice.q, y, x_start, x_end + 1, velocity_profile=self.velocity_profile))
 		for x, y_start, y_end in vel_detector.left_walls:
-			self._boundaries.append(_LeftWall(self._lattice.q, x, y_start, y_end + 1, velocity_profile=self.velocity_profile[y_start:y_end+1, x]))
+			self._boundaries.append(_LeftWall(self._lattice.q, x, y_start, y_end + 1, velocity_profile=self.velocity_profile))
 		for x, y_start, y_end in vel_detector.right_walls:
-			self._boundaries.append(_RightWall(self._lattice.q, x, y_start, y_end + 1, velocity_profile=self.velocity_profile[y_start:y_end+1, x]))
+			self._boundaries.append(_RightWall(self._lattice.q, x, y_start, y_end + 1, velocity_profile=self.velocity_profile))
 
 		dens_detector = WallDetector()
 		dens_detector.detect(density_geometry, other_boundaries=plain_geometry | velocity_geometry)
 
 		for y, x_start, x_end in dens_detector.bot_walls:
-			self._boundaries.append(_BottomWall(self._lattice.q, y, x_start, x_end + 1, density_profile=self.density_profile[y, x_start:x_end+1]))
+			self._boundaries.append(_BottomWall(self._lattice.q, y, x_start, x_end + 1, density_profile=self.density_profile))
 		for y, x_start, x_end in dens_detector.top_walls:
-			self._boundaries.append(_TopWall(self._lattice.q, y, x_start, x_end + 1, density_profile=self.density_profile[y, x_start:x_end+1]))
+			self._boundaries.append(_TopWall(self._lattice.q, y, x_start, x_end + 1, density_profile=self.density_profile))
 		for x, y_start, y_end in dens_detector.left_walls:
-			self._boundaries.append(_LeftWall(self._lattice.q, x, y_start, y_end + 1, density_profile=self.density_profile[y_start:y_end+1, x]))
+			self._boundaries.append(_LeftWall(self._lattice.q, x, y_start, y_end + 1, density_profile=self.density_profile))
 		for x, y_start, y_end in dens_detector.right_walls:
-			self._boundaries.append(_RightWall(self._lattice.q, x, y_start, y_end + 1, density_profile=self.density_profile[y_start:y_end+1, x]))
+			self._boundaries.append(_RightWall(self._lattice.q, x, y_start, y_end + 1, density_profile=self.density_profile))
 
 		detector = WallDetector()
 		detector.detect(plain_geometry, other_boundaries=velocity_geometry | density_geometry)
