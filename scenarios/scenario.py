@@ -29,7 +29,6 @@ class Scenario(ABC):
 
 		self._lbm = self._create(conversion_mode=mode)
 
-		self.setup(self._lbm)
 		self.define_scenario(self._lbm)
 		self._lbm.check_parameters_set()
 		self._lbm.initialize_distribution_function()
