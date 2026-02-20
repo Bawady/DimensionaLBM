@@ -4,7 +4,6 @@ import pathlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-from dimensional_lbm.boundaries.boundary import load_geometry
 from dimensional_lbm.boundaries.zou_he import ZouHe
 from dimensional_lbm.conversion_mode import Dimensional, NonDimensional
 from dimensional_lbm.lattices.d2q9 import D2Q9
@@ -19,8 +18,8 @@ class LidDrivenCavity(Scenario):
 		lbm.dx = lbm.us.quantity(1, "mm")
 		lbm.dt = lbm.us.quantity(1, "us")
 
-		lbm.width = lbm.us.quantity(128, "mm")
-		lbm.height = lbm.us.quantity(100, "mm")
+		lbm.width = lbm.us.quantity(100, "mm")
+		lbm.height = lbm.us.quantity(150, "mm")
 
 		lbm.lattice = D2Q9(lbm.dx, lbm.dt)
 
@@ -37,7 +36,8 @@ class LidDrivenCavity(Scenario):
 		max_speed = lbm.us.quantity(0.1, "m/s")
 		for x in range(lbm.x):
 			lbm.boundary.velocity_profile[0, x] = lambda step: max_speed * (1 - math.exp(-step**2 / (2 * 100))) * np.array([1, 0])
-			lbm.boundary.velocity_profile[-1, x] = lambda step: -max_speed * (1 - math.exp(-step**2 / (2 * 100))) * np.array([1, 0])
+		for y in range(lbm.y):
+			lbm.boundary.velocity_profile[y, 0] = lambda step: -.75*max_speed * (1 - math.exp(-step**2 / (2 * 100))) * np.array([0, 1])
 
 
 if __name__ == "__main__":
