@@ -23,7 +23,7 @@ class D2Q9(DdQqLattice):
 	dir_x: ClassVar[np.ndarray] = np.array([0, 1, -1, 0, 0, 1, -1, 1, -1], dtype=int)
 	dir_y: ClassVar[np.ndarray] = np.array([0, 0, 0, -1, 1, 1, -1, -1, 1], dtype=int)
 
-	def __init__(self, dx: ScalarT, dt: ScalarT):
+	def __init__(self, dx: ScalarT, dt: ScalarT) -> None:
 		self.dx = dx
 		self.dt = dt
 
