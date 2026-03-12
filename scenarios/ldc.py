@@ -1,7 +1,6 @@
 import math
 import pathlib
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from dimensional_lbm.boundaries.zou_he import ZouHe

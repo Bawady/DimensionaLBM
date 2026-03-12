@@ -29,11 +29,11 @@ class DdQqLattice(ABC, Generic[ScalarT, VectorT]):
 	cs_n4: ScalarT
 
 	@abstractmethod
-	def __init__(self, dx: ScalarT, dt: ScalarT):
+	def __init__(self, dx: ScalarT, dt: ScalarT) -> None:
 		pass
 
 	@classmethod
-	def __init_subclass(cls, **kwargs) -> None:
+	def __init_subclass(cls, **kwargs) -> None:  # noqa: ANN003 (PEP 487 doesn't provide )
 		super().__init_subclass__(**kwargs)
 
 		if not hasattr(cls, "D") or cls.D is None:

@@ -17,9 +17,17 @@ ignore = [
 		"D206",    # requires whitespace indentation for docstrings (conflicting with tab indent)
 		"G004",    # I like f-strings in logging statements
 		"ERA001",  # This rule, about commented out code, is just stupid. It basically only consists of false positives
+
+		# Just for now
+		"D100",
+		"D101",
+		"D102",
+		"D107",
+		"UP046",
 	]
 
 [lint.pydocstyle]
 convention = "google"
 
 [lint.per-file-ignores]
+"dimensional_lbm/boundaries/test_wall_detector.py" = ["S101"]

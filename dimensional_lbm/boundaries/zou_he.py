@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import typing
 from abc import ABC, abstractmethod
 from enum import Enum, auto
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Any, Generic, cast
 
 import numpy as np
 from numpy import ndarray
@@ -12,8 +13,6 @@ from dimensional_lbm.boundaries.wall_detector import WallDetector
 from dimensional_lbm.unit_system_if import ScalarT, VectorT
 
 if TYPE_CHECKING:
-	from collections.abc import Callable
-
 	from dimensional_lbm.lattices.ddqq_lattice import DdQqLattice
 	from dimensional_lbm.lbm import LBM
 
@@ -25,17 +24,26 @@ class _CornerOrientation(Enum):
 	TOP_RIGHT = auto()
 
 
+class VectorCallback(typing.Protocol, Generic[VectorT]):
+	def __call__(self, coordinate: int) -> VectorT:
+		...
+
+class ScalarCallback(typing.Protocol, Generic[ScalarT]):
+	def __call__(self, coordinate: int) -> ScalarT:
+		...
+
+
 class _VelocityProfile(Generic[VectorT]):
 	_profile : VectorT
-	_callbacks : list[tuple[Any, Callable[int], VectorT]]
+	_callbacks : list[tuple[Any, VectorCallback]]
 	_last_step : int
 
 	def __init__(self, lbm: LBM) -> None:
-		self._profile = lbm.us.quantity(np.zeros((lbm.y, lbm.x, lbm.lattice.D)), "m/s")
+		self._profile = cast("VectorT", lbm.us.quantity(np.zeros((lbm.y, lbm.x, lbm.lattice.D)), "m/s"))
 		self._callbacks = []
 		self._last_step = -1
 
-	def __setitem__(self, key: Any, value: VectorT | Callable[[int], VectorT]) -> None:
+	def __setitem__(self, key: Any, value: VectorT | VectorCallback) -> None:
 		if callable(value):
 			self._callbacks.append((key, value))
 		else:
@@ -58,21 +66,21 @@ class _VelocityProfile(Generic[VectorT]):
 
 class _DensityProfile(Generic[ScalarT, VectorT]):
 	_profile : VectorT
-	_callbacks : list[tuple[Any, Callable[int], ScalarT]]
+	_callbacks : list[tuple[Any, ScalarCallback]]
 	_last_step : int
 
 	def __init__(self, lbm: LBM) -> None:
-		self._profile = lbm.us.quantity(np.zeros((lbm.y, lbm.x)), "kg/m**3")
+		self._profile = cast("VectorT", lbm.us.quantity(np.zeros((lbm.y, lbm.x)), "kg/m**3"))
 		self._callbacks = []
 		self._last_step = -1
 
-	def __setitem__(self, key: Any, value: VectorT | Callable[[int], ScalarT]) -> None:
+	def __setitem__(self, key: Any, value: ScalarT | ScalarCallback) -> None:
 		if callable(value):
 			self._callbacks.append((key, value))
 		else:
 			self._profile[key] = value
 
-	def get(self, step: int) -> ScalarT:
+	def get(self, step: int) -> VectorT:
 		if step > self._last_step:
 			for cb in self._callbacks:
 				self._profile[cb[0]] = cb[-1](step)
@@ -97,7 +105,12 @@ class _ZouHeBoundary(ABC, Generic[ScalarT, VectorT]):
 
 
 class _BottomWall(_ZouHeBoundary[ScalarT, VectorT]):
-	def __init__(self, q: ScalarT, y: int, x0: int, x1: int, velocity_profile: _VelocityProfile | None = None, density_profile: _DensityProfile | None = None) -> None:
+	def __init__(
+		self, q: ScalarT,
+		y: int, x0: int, x1: int,
+		velocity_profile: _VelocityProfile | None = None,
+		density_profile: _DensityProfile | None = None
+	) -> None:
 		self._q = q
 		self._y = y
 		self._x0 = x0
@@ -140,7 +153,11 @@ class _BottomWall(_ZouHeBoundary[ScalarT, VectorT]):
 
 
 class _TopWall(_ZouHeBoundary[ScalarT, VectorT]):
-	def __init__(self, q: ScalarT, y: int, x0: int, x1: int, velocity_profile: _VelocityProfile | None = None, density_profile: _DensityProfile | None = None) -> None:
+	def __init__(
+		self, q: ScalarT, y: int, x0: int, x1: int,
+		velocity_profile: _VelocityProfile | None = None,
+		density_profile: _DensityProfile | None = None
+	) -> None:
 		self._q = q
 		self._y = y
 		self._x0 = x0
@@ -175,7 +192,7 @@ class _TopWall(_ZouHeBoundary[ScalarT, VectorT]):
 		vel_x = u[y, x0:x1, 0]
 		vel_y = u[y, x0:x1, 1]
 		# down
-		f[4, y, x0:x1] = f[3, y, x0:x1] + 2 * wall_dens * vel_y / (3 * q)
+		f[4, y, x0:x1] = f[3, y, x0:x1] + 2 * wall_dens * vel_y / (3 * q) # pyright: ignore[reportArgumentType]
 		# down-right
 		f[5, y, x0:x1] = f[6, y, x0:x1] - 0.5 * (f[1, y, x0:x1] - f[2, y, x0:x1]) + wall_dens / q * (0.5 * vel_x + 1 / 6.0 * vel_y)
 		# down-left
@@ -183,7 +200,11 @@ class _TopWall(_ZouHeBoundary[ScalarT, VectorT]):
 
 
 class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
-	def __init__(self, q: ScalarT, x: int, y0: int, y1: int, velocity_profile: _VelocityProfile | None = None, density_profile: _DensityProfile | None = None) -> None:
+	def __init__(
+		self, q: ScalarT, x: int, y0: int, y1: int,
+		velocity_profile: _VelocityProfile | None = None,
+		density_profile: _DensityProfile | None = None
+	) -> None:
 		self._q = q
 		self._x = x
 		self._y0 = y0
@@ -211,13 +232,14 @@ class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
 				1 - (f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[2, y0:y1, x] + f[6, y0:y1, x] + f[8, y0:y1, x])) / density
 			)
 		else:
-			raise ValueError("Neither velocity nor density profile given")
+			msg = "Neither velocity nor density profile given"
+			raise ValueError(msg)
 
 		wall_dens = rho[y0:y1, x]
 		vel_x = u[y0:y1, x, 0]
 		vel_y = u[y0:y1, x, 1]
 		# right
-		f[1, y0:y1, x] = f[2, y0:y1, x] + 2 * wall_dens * vel_x / (3 * q)
+		f[1, y0:y1, x] = f[2, y0:y1, x] + 2 * wall_dens * vel_x / (3 * q) # pyright: ignore[reportArgumentType]
 		# down-right
 		f[5, y0:y1, x] = f[6, y0:y1, x] - 0.5 * (f[4, y0:y1, x] - f[3, y0:y1, x]) + wall_dens / q * (1 / 6.0 * vel_x + 0.5 * vel_y)
 		# up-right
@@ -225,7 +247,11 @@ class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
 
 
 class _RightWall(_ZouHeBoundary[ScalarT, VectorT]):
-	def __init__(self, q: ScalarT, x: int, y0: int, y1: int, velocity_profile: _VelocityProfile | None = None, density_profile: _DensityProfile | None = None) -> None:
+	def __init__(
+		self, q: ScalarT, x: int, y0: int, y1: int,
+		velocity_profile: _VelocityProfile | None = None,
+		density_profile: _DensityProfile | None = None
+	) -> None:
 		self._q = q
 		self._x = x
 		self._y0 = y0
@@ -253,7 +279,8 @@ class _RightWall(_ZouHeBoundary[ScalarT, VectorT]):
 				(f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[1, y0:y1, x] + f[5, y0:y1, x] + f[7, y0:y1, x])) / density - 1
 			)
 		else:
-			raise ValueError("Neither velocity nor density profile given")
+			msg = "Neither velocity nor density profile given"
+			raise ValueError(msg)
 
 		wall_dens = rho[y0:y1, x]
 		vel_x = u[y0:y1, x, 0]
@@ -282,7 +309,7 @@ class _ConvexCorner(_ZouHeBoundary[ScalarT, VectorT]):
 		self._dst = dst
 		self._src = src
 
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step:int) -> None:
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step:int) -> None:  # noqa: ARG002
 		f[self._dst, self._ys, self._xs] = f[self._src, self._ys, self._xs]
 
 
@@ -300,7 +327,7 @@ class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 			_CornerOrientation.BOT_RIGHT: self._apply_bot_right,
 		}[orientation]
 
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step: int) -> None:
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step: int) -> None:  # noqa: ARG002
 		for i in range(len(self._ys)):
 			self._apply_single(f, rho, u, self._ys[i], self._xs[i])
 
@@ -310,8 +337,9 @@ class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 		u[y, x, 1] = u[ y - 1, x, 1]
 		rho[y, x] = rho[y, x + 1]
 
-		f[1, y, x] = f[2, y, x] + 2.0 * rho[y, x] * u[y, x, 0] / (3 * q)
-		f[3, y, x] = f[4, y, x] - 2.0 * rho[y, x] * u[y, x, 1] / (3 * q)
+
+		f[1, y, x] = f[2, y, x] + 2 * rho[y, x] * u[y, x, 0] / (3 * q) # pyright: ignore[reportArgumentType]
+		f[3, y, x] = f[4, y, x] - 2 * rho[y, x] * u[y, x, 1] / (3 * q)
 		f[7, y, x] = f[8, y, x] + rho[y, x] * (u[y, x, 0] - u[y, x, 1]) / (6 * q)
 		f[5, y, x] *= 0
 		f[6, y, x] *= 0
@@ -336,9 +364,9 @@ class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 		u[y, x, 1] = u[y + 1, y, 1]
 		rho[y, x] = rho[y, x + 1]
 
-		f[1, y, x] = f[2, y, x] + 2.0 * rho[y, x] * u[y, x, 0] / (3 * q)
-		f[4, y, x] = f[3, y, x] + 2.0 * rho[y, x] * u[y, x, 1] / (3 * q)
-		f[5, y, x] = f[6, y, x] + rho[y, x] * (u[y, x, 0] + u[y, x, 1]) / (6 * q)
+		f[1, y, x] = f[2, y, x] + 2.0 * rho[y, x] * u[y, x, 0] / (3 * q) # pyright: ignore[reportArgumentType]
+		f[4, y, x] = f[3, y, x] + 2.0 * rho[y, x] * u[y, x, 1] / (3 * q) # pyright: ignore[reportArgumentType]
+		f[5, y, x] = f[6, y, x] + rho[y, x] * (u[y, x, 0] + u[y, x, 1]) / (6 * q) # pyright: ignore[reportArgumentType]
 		f[7, y, x] *= 0
 		f[8, y, x] *= 0
 		f[0, y, x] = rho[y, x] - np.sum(f[1:9, y, x])
@@ -350,8 +378,8 @@ class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 		rho[y, x] = rho[y, x - 1]
 
 		f[2, y, x] = f[1, y, x] - 2.0 * rho[y, x] * u[y, x, 0] / (3 * q)
-		f[4, y, x] = f[3, y, x] + 2.0 * rho[y, x] * u[y, x, 1] / (3 * q)
-		f[8, y, x] = f[7, y, x] + rho[y, x] * (-u[y, x, 0] + u[y, x, 1]) / (6 * q)
+		f[4, y, x] = f[3, y, x] + 2.0 * rho[y, x] * u[y, x, 1] / (3 * q) # pyright: ignore[reportArgumentType]
+		f[8, y, x] = f[7, y, x] + rho[y, x] * (-u[y, x, 0] + u[y, x, 1]) / (6 * q) # pyright: ignore[reportArgumentType]
 		f[5, y, x] *= 0
 		f[6, y, x] *= 0
 		f[0, y, x] = rho[y, x] - np.sum(f[1:9, y, x])

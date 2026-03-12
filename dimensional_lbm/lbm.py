@@ -202,24 +202,11 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		self._bgk_tau = tau
 		self._bgk_omega = 1 / tau
 
-	def __init__(self):
+	def __init__(self) -> None:
 		"""Initialize the LBM simulation with default values."""
 		self._runs = 0
 		self._x = 0
 		self._y = 0
-
-	def setup(self) -> None:
-		"""Configure simulation parameters before running.
-
-		Override this method in subclasses to set up:
-			- Lattice type (e.g., D2Q9)
-			- Grid spacing (dx) and time step (dt)
-			- Domain dimensions (width, height)
-			- BGK relaxation time (bgk_tau)
-
-		This method is called automatically before before the simulation starts with a call to `run`.
-		"""
-		pass
 
 	def define_scenario(self) -> None:
 		"""Define the initial conditions and scenario-specific setup.
@@ -232,7 +219,6 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		This method is called after setup() and __init_sim_params(), so all arrays
 		(f, feq, u, density, solid) are already allocated and available for initialization.
 		"""
-		pass
 
 	def viscosity_to_bgk_tau(self, viscosity: ScalarT) -> ScalarT:
 		"""Convert kinematic viscosity to BGK relaxation time.
@@ -393,9 +379,8 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 
 		Called at the end of each simulation step after streaming.
 		"""
-		pass
 
-	def dump(self, dump_dir_p: os.PathLike) -> None:
+	def dump(self, dump_dir: os.PathLike) -> None:
 		"""Save simulation snapshots to disk.
 
 		Outputs density and velocity magnitude fields as PNG images. Solid
@@ -403,32 +388,27 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		mode, also performs unit consistency assertions.
 
 		Args:
-			dump_dir_p: Directory path where output files will be saved.
+			dump_dir: Directory path where output files will be saved.
 				The directry is created if it does not yet exist.
 				Files are named "density_{step}.png" and "fluid_velocity_{step}.png".
 		"""
+		dump_dir_p = Path(dump_dir)
 		dump_dir_p.mkdir(exist_ok=True)
 
 		cmap = cm.get_cmap("viridis")
-		density_rgba = cmap(self.density)
+		density_rgba = cmap(self.density / np.max(self.density))
 
 		fluid_vel_abs = np.sqrt(self.u[:, :, 0] ** 2 + self.u[:, :, 1] ** 2)
-		fluid_vel_rgba = cmap(fluid_vel_abs)
-
-		overlay = np.array([1, 0, 0, 0.5])
-#		mask = self.boundary.geometry == 1
+		fluid_vel_rgba = cmap(fluid_vel_abs / np.max(fluid_vel_abs)) if np.max(fluid_vel_abs) > 0 else cmap(fluid_vel_abs)
 
 		dump_data = {"density": density_rgba, "fluid_velocity": fluid_vel_rgba}
 
 		for name, rgba in dump_data.items():
-			for i in range(3):
-				rgba = dump_data[name]
-#				rgba[mask, i] = overlay[3] * overlay[i] + (1 - overlay[3]) * rgba[mask, i]
 			plt_img.imsave(dump_dir_p / f"{name}_{self._runs}.png", rgba, dpi=600)
 
 		if isinstance(self.us.mode, Dimensional):
-			assert self.density.dimensionality == self.us.quantity(1, "kg/m**3").dimensionality
-			assert self.u.dimensionality == self.us.quantity(1, "m/s").dimensionality
+			assert self.density.dimensionality == self.us.quantity(1, "kg/m**3").dimensionality  # noqa: S101
+			assert self.u.dimensionality == self.us.quantity(1, "m/s").dimensionality  # noqa: S101
 
 	def _set_unit_system(self, us: UnitSystem[ModeT]) -> None:
 		"""Set the unit system for the simulation.

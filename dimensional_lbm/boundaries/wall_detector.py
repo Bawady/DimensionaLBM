@@ -18,7 +18,7 @@ class WallDetector:
 	position (the direction where the two walls meet).
 	"""
 
-	def __init__(self):
+	def __init__(self) -> None:
 		self._height = 0
 		self._width = 0
 		# Corner positions as (2, N) arrays: [y_coords; x_coords]
@@ -182,9 +182,7 @@ class WallDetector:
 		segments.append((int(sw[static_ax, curr]), int(sw[move_ax, curr]), int(sw[move_ax, n - 1])))
 
 		# Merge periodic segments (walls that wrap around)
-		segments = self._merge_periodic_segments(segments, max_coord, direction)
-
-		return segments
+		return self._merge_periodic_segments(segments, max_coord, direction)
 
 	def _merge_periodic_segments(self, segments: list[tuple[int, int, int]], max_coord: int, direction: str) -> list[tuple[int, int, int]]:
 		"""Merge segments that touch opposite edges (periodic boundary)."""
@@ -215,7 +213,7 @@ class WallDetector:
 					end_seg = at_end[0]
 
 					# Remove both from segs
-					segs = [s for s in segs if s != start_seg and s != end_seg]
+					segs = [s for s in segs if s not in (start_seg, end_seg)]
 					# Add merged segment (end_seg.start to start_seg.end, wrapping)
 					segs.append((end_seg[0], start_seg[1]))
 

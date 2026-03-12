@@ -29,7 +29,7 @@ class Poiseuille(Scenario):
 		lbm.density[:, :] = initial_density
 
 		lbm.boundary = ZouHe(lbm)
-		lbm.boundary.geometry = load_geometry("pipe.png")
+		lbm.boundary.geometry = load_geometry("geometries/pipe.png")
 
 		max_speed = lbm.us.quantity(0.8, "m/s")
 		for y in range(lbm.y):
