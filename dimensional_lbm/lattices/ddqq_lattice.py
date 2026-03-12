@@ -32,6 +32,7 @@ class DdQqLattice(ABC, Generic[ScalarT, VectorT]):
 	def __init__(self, dx: ScalarT, dt: ScalarT):
 		pass
 
+	@classmethod
 	def __init_subclass(cls, **kwargs) -> None:
 		super().__init_subclass__(**kwargs)
 
@@ -71,6 +72,7 @@ class DdQqLattice(ABC, Generic[ScalarT, VectorT]):
 	#####     Boundary Conditions     #####
 	#######################################
 
+	@abstractmethod
 	def bc_bot(
 		self,
 		f: VectorT,
@@ -81,9 +83,10 @@ class DdQqLattice(ABC, Generic[ScalarT, VectorT]):
 		x1: int,
 		velocity_profile: VectorT | None = None,
 		rho_profile: VectorT | None = None,
-	) -> None:  # noqa: E101
+	) -> None:
 		pass
 
+	@abstractmethod
 	def bc_top(
 		self,
 		f: VectorT,
@@ -94,9 +97,10 @@ class DdQqLattice(ABC, Generic[ScalarT, VectorT]):
 		x1: int,
 		velocity_profile: np.ndarray | None = None,
 		rho_profile: VectorT | None = None,
-	) -> None:  # noqa: E101
+	) -> None:
 		pass
 
+	@abstractmethod
 	def bc_left(
 		self,
 		f: VectorT,
@@ -107,9 +111,10 @@ class DdQqLattice(ABC, Generic[ScalarT, VectorT]):
 		y1: int,
 		velocity_profile: np.ndarray | None = None,
 		rho_profile: np.ndarray | None = None,
-	) -> None:  # noqa: E101
+	) -> None:
 		pass
 
+	@abstractmethod
 	def bc_right(
 		self,
 		f: VectorT,
@@ -120,31 +125,39 @@ class DdQqLattice(ABC, Generic[ScalarT, VectorT]):
 		y1: int,
 		velocity_profile: np.ndarray | None = None,
 		rho_profile: np.ndarray | None = None,
-	) -> None:  # noqa: E101
+	) -> None:
 		pass
 
 	##### Corner Boundaries
 
+	@abstractmethod
 	def bc_concave_bot_left(self, f: VectorT, rho: VectorT, u: VectorT, y: int, x: int) -> None:
 		pass
 
+	@abstractmethod
 	def bc_concave_bot_right(self, f: VectorT, rho: VectorT, u: VectorT, y: int, x: int) -> None:
 		pass
 
+	@abstractmethod
 	def bc_concave_top_left(self, f: VectorT, rho: VectorT, u: VectorT, y: int, x: int) -> None:
 		pass
 
+	@abstractmethod
 	def bc_concave_top_right(self, f: VectorT, rho: VectorT, u: VectorT, y: int, x: int) -> None:
 		pass
 
+	@abstractmethod
 	def bc_convex_top_right(self, f: VectorT, rho: VectorT, u: VectorT, y: int, x: int) -> None:
 		pass
 
+	@abstractmethod
 	def bc_convex_bot_right(self, f: VectorT, rho: VectorT, u: VectorT, y: int, x: int) -> None:
 		pass
 
+	@abstractmethod
 	def bc_convex_top_left(self, f: VectorT, rho: VectorT, u: VectorT, y: int, x: int) -> None:
 		pass
 
+	@abstractmethod
 	def bc_convex_bot_left(self, f: VectorT, rho: VectorT, u: VectorT, y: int, x: int) -> None:
 		pass

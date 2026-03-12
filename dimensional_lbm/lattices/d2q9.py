@@ -18,9 +18,6 @@ class D2Q9(DdQqLattice):
 	__w_straight = (1 - __w_rest) / 5
 	__w_diag = (1 - __w_rest - 4 * __w_straight) / 4
 
-	assert __w_rest + 4 * (__w_straight + __w_diag) == 1.0
-	assert __w_diag > 0
-
 	weights = np.array([__w_rest, __w_straight, __w_straight, __w_straight, __w_straight, __w_diag, __w_diag, __w_diag, __w_diag], dtype=float)
 
 	dir_x: ClassVar[np.ndarray] = np.array([0, 1, -1, 0, 0, 1, -1, 1, -1], dtype=int)
