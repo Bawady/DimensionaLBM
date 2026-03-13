@@ -195,3 +195,25 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 				scale *= qs[key] ** p
 		d = 1 / coeffs[0]["q"]
 		return (x * scale**d).to_base_units()
+
+	@overload
+	def to_unit(self, x: float, unit: str) -> float: ...
+
+	@overload
+	def to_unit(self, x: np.ndarray, unit: str) -> np.ndarray: ...
+
+	@overload
+	def to_unit(self, x: PlainQuantity[float], unit: str) ->PlainQuantity[float]: ...
+
+	@overload
+	def to_unit(self, x: PlainQuantity[int], unit: str) ->PlainQuantity[int]: ...
+
+	@overload
+	def to_unit(self, x: NumpyQuantity, unit: str) -> NumpyQuantity: ...
+
+	def to_unit(self, x: Quantity, unit: str) -> Quantity:
+		"""Return x converted to the given unit (must have same dimensionality)."""
+		# TODO: Either handle MangitudeOnly here (by passiong an optional unit for x), or remove this mode altogether
+		if isinstance(x, (int, float, np.ndarray)):
+			return x
+		return x.to(unit)

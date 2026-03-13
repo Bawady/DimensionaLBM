@@ -15,11 +15,12 @@ The LBM algorithm follows the standard workflow:
 
 import os
 from pathlib import Path
-from typing import ClassVar, Generic
+from typing import ClassVar, Generic, cast
 
 import matplotlib.image as plt_img
 import numpy as np
 from matplotlib import cm
+from pint.facets.numpy.quantity import NumpyQuantity
 
 from dimensional_lbm.boundaries.boundary import Boundary
 from dimensional_lbm.conversion_mode import Dimensional, ModeT
@@ -258,7 +259,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		self.update_feq()
 		self.collide()
 		self.stream()
-		self._boundary.apply_boundaries(self.f, self.density, self.u)
+		self._boundary.apply_boundaries(self.f, self.density, self.u, self._runs * self.dt)
 		self._runs += 1
 
 	def initialize_distribution_function(self) -> None:
@@ -268,7 +269,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		fields (density, u) and sets f = f_eq as the initial condition.
 		"""
 		self.update_feq()
-		self.f = self.feq.copy()
+		self.f = cast("VectorT", self.feq.copy())
 
 	def run(self, runs: int, dump_period: int, out_dir_p: Path) -> None:
 		"""Run the LBM simulation for a specified number of time steps.
@@ -365,7 +366,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		where omega = 1/tau is the relaxation frequency.
 		"""
 		relax_factor = self.dt * self._bgk_omega
-		self.fcoll = (1 - relax_factor) * self.f + relax_factor * self.feq
+		self.fcoll = cast("VectorT", (1 - relax_factor) * self.f + relax_factor * self.feq)
 
 	def boundaries(self) -> None:
 		"""Apply boundary conditions.
@@ -398,7 +399,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		cmap = cm.get_cmap("viridis")
 		density_rgba = cmap(self.density / np.max(self.density))
 
-		fluid_vel_abs = np.sqrt(self.u[:, :, 0] ** 2 + self.u[:, :, 1] ** 2)
+		fluid_vel_abs = np.sqrt(self.us.magnitude(self.u)[:, :, 0] ** 2 + self.us.magnitude(self.u)[:, :, 1] ** 2)
 		fluid_vel_rgba = cmap(fluid_vel_abs / np.max(fluid_vel_abs)) if np.max(fluid_vel_abs) > 0 else cmap(fluid_vel_abs)
 
 		dump_data = {"density": density_rgba, "fluid_velocity": fluid_vel_rgba}
@@ -407,6 +408,8 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 			plt_img.imsave(dump_dir_p / f"{name}_{self._runs}.png", rgba, dpi=600)
 
 		if isinstance(self.us.mode, Dimensional):
+			assert isinstance(self.density, NumpyQuantity)  # noqa: S101
+			assert isinstance(self.u, NumpyQuantity)  # noqa: S101
 			assert self.density.dimensionality == self.us.quantity(1, "kg/m**3").dimensionality  # noqa: S101
 			assert self.u.dimensionality == self.us.quantity(1, "m/s").dimensionality  # noqa: S101
 

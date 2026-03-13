@@ -7,12 +7,16 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 
 import numpy as np
 from numpy import ndarray
+# TODO: These imports should not be necessary here
+from pint.facets.numpy.quantity import NumpyQuantity
+from pint.facets.plain import PlainQuantity
 
 from dimensional_lbm.boundaries.boundary import Boundary
 from dimensional_lbm.boundaries.wall_detector import WallDetector
 from dimensional_lbm.unit_system_if import ScalarT, VectorT
 
 if TYPE_CHECKING:
+	from dimensional_lbm.boundaries.callbacks import ScalarCallback, VectorCallback
 	from dimensional_lbm.lattices.ddqq_lattice import DdQqLattice
 	from dimensional_lbm.lbm import LBM
 
@@ -24,36 +28,31 @@ class _CornerOrientation(Enum):
 	TOP_RIGHT = auto()
 
 
-class VectorCallback(typing.Protocol, Generic[VectorT]):
-	def __call__(self, coordinate: int) -> VectorT:
-		...
-
-class ScalarCallback(typing.Protocol, Generic[ScalarT]):
-	def __call__(self, coordinate: int) -> ScalarT:
-		...
-
-
-class _VelocityProfile(Generic[VectorT]):
+class _VelocityProfile(Generic[ScalarT, VectorT]):
 	_profile : VectorT
 	_callbacks : list[tuple[Any, VectorCallback]]
-	_last_step : int
+	_last_time : ScalarT
+	_lbm: LBM
 
 	def __init__(self, lbm: LBM) -> None:
 		self._profile = cast("VectorT", lbm.us.quantity(np.zeros((lbm.y, lbm.x, lbm.lattice.D)), "m/s"))
 		self._callbacks = []
-		self._last_step = -1
+		self._last_time = cast("ScalarT", lbm.us.quantity(0, "sec"))
+		self._lbm = lbm
 
 	def __setitem__(self, key: Any, value: VectorT | VectorCallback) -> None:
 		if callable(value):
 			self._callbacks.append((key, value))
+		elif isinstance(self._profile, NumpyQuantity) and isinstance(value, NumpyQuantity):
+			self._profile[key] = self._lbm.us.to_unit(value, str(self._profile.units)).magnitude
 		else:
 			self._profile[key] = value
 
-	def get(self, step: int) -> VectorT:
-		if step > self._last_step:
+	def get(self, time: ScalarT) -> VectorT:
+		if time > self._last_time:
 			for cb in self._callbacks:
-				self._profile[cb[0]] = cb[-1](step)
-			self._last_step = step
+				self._profile[cb[0]] = cb[-1](time)
+			self._last_time = time
 		return self._profile
 
 	@property
@@ -67,24 +66,28 @@ class _VelocityProfile(Generic[VectorT]):
 class _DensityProfile(Generic[ScalarT, VectorT]):
 	_profile : VectorT
 	_callbacks : list[tuple[Any, ScalarCallback]]
-	_last_step : int
+	_last_time : ScalarT
+	_lbm: LBM
 
 	def __init__(self, lbm: LBM) -> None:
 		self._profile = cast("VectorT", lbm.us.quantity(np.zeros((lbm.y, lbm.x)), "kg/m**3"))
 		self._callbacks = []
-		self._last_step = -1
+		self._last_time = cast("ScalarT", lbm.us.quantity(0, "sec"))
+		self._lbm = lbm
 
 	def __setitem__(self, key: Any, value: ScalarT | ScalarCallback) -> None:
 		if callable(value):
 			self._callbacks.append((key, value))
+		elif isinstance(self._profile, NumpyQuantity) and isinstance(value, PlainQuantity):
+			self._profile[key] = self._lbm.us.to_unit(value, str(self._profile.units)).magnitude
 		else:
 			self._profile[key] = value
 
-	def get(self, step: int) -> VectorT:
-		if step > self._last_step:
+	def get(self, time: ScalarT) -> VectorT:
+		if time > self._last_time:
 			for cb in self._callbacks:
-				self._profile[cb[0]] = cb[-1](step)
-			self._last_step = step
+				self._profile[cb[0]] = cb[-1](time)
+			self._last_time = time
 		return self._profile
 
 	@property
@@ -100,7 +103,7 @@ class _ZouHeBoundary(ABC, Generic[ScalarT, VectorT]):
 	"""Abstract base class for individual Zou-He boundary segments."""
 
 	@abstractmethod
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step:int) -> None:
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT, time: ScalarT) -> None:
 		pass
 
 
@@ -118,7 +121,7 @@ class _BottomWall(_ZouHeBoundary[ScalarT, VectorT]):
 		self.velocity_profile = velocity_profile
 		self.density_profile = density_profile
 
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step:int) -> None:
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT, time: ScalarT) -> None:
 		y, x0, x1, q = self._y, self._x0, self._x1, self._q
 		velocity_profile = self.velocity_profile
 		density_profile = self.density_profile
@@ -127,11 +130,11 @@ class _BottomWall(_ZouHeBoundary[ScalarT, VectorT]):
 			scale = q / (q + u[y, x0:x1, 1])
 			rho[y, x0:x1] = scale * (f[0, y, x0:x1] + f[1, y, x0:x1] + f[2, y, x0:x1] + 2 * (f[4, y, x0:x1] + f[5, y, x0:x1] + f[8, y, x0:x1]))
 			if velocity_profile is not None:
-				u[y, x0:x1] = velocity_profile.get(step)[y, x0:x1]
+				u[y, x0:x1] = velocity_profile.get(time)[y, x0:x1]
 			else:
 				u[y, x0:x1] *= 0
 		elif velocity_profile is None:
-			density = density_profile.get(step)[y, x0:x1]
+			density = density_profile.get(time)[y, x0:x1]
 			rho[y, x0:x1] = density
 			u[y, x0:x1, 0] *= 0
 			u[y, x0:x1, 1] = q * (
@@ -165,7 +168,7 @@ class _TopWall(_ZouHeBoundary[ScalarT, VectorT]):
 		self.velocity_profile = velocity_profile
 		self.density_profile = density_profile
 
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT,step:int) -> None:
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT,time: ScalarT) -> None:
 		y, x0, x1, q = self._y, self._x0, self._x1, self._q
 		velocity_profile = self.velocity_profile
 		density_profile = self.density_profile
@@ -174,11 +177,11 @@ class _TopWall(_ZouHeBoundary[ScalarT, VectorT]):
 			scale = q / (q - u[y, x0:x1, 1])
 			rho[y, x0:x1] = scale * (f[0, y, x0:x1] + f[1, y, x0:x1] + f[2, y, x0:x1] + 2 * (f[3, y, x0:x1] + f[6, y, x0:x1] + f[7, y, x0:x1]))
 			if velocity_profile is not None:
-				u[y, x0:x1] = velocity_profile.get(step)[y, x0:x1]
+				u[y, x0:x1] = velocity_profile.get(time)[y, x0:x1]
 			else:
 				u[y, x0:x1] *= 0
 		elif velocity_profile is None:
-			density = density_profile.get(step)[y, x0:x1]
+			density = density_profile.get(time)[y, x0:x1]
 			rho[y, x0:x1] = density
 			u[y, x0:x1, 0] = 0
 			u[y, x0:x1, 1] = q * (
@@ -212,7 +215,7 @@ class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
 		self.velocity_profile = velocity_profile
 		self.density_profile = density_profile
 
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step:int) -> None:
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT, time: ScalarT) -> None:
 		x, y0, y1, q = self._x, self._y0, self._y1, self._q
 		velocity_profile = self.velocity_profile
 		density_profile = self.density_profile
@@ -221,11 +224,11 @@ class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
 			scale = q / (q - u[y0:y1, x, 0])
 			rho[y0:y1, x] = scale * (f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[2, y0:y1, x] + f[6, y0:y1, x] + f[8, y0:y1, x]))
 			if velocity_profile is not None:
-				u[y0:y1, x] = velocity_profile.get(step)[y0:y1, x]
+				u[y0:y1, x] = velocity_profile.get(time)[y0:y1, x]
 			else:
 				u[y0:y1, x] *= 0
 		elif velocity_profile is None:
-			density = density_profile.get(step)[y0:y1, x]
+			density = density_profile.get(time)[y0:y1, x]
 			rho[y0:y1, x] = density
 			u[y0:y1, x, 1] = 0
 			u[y0:y1, x, 0] = q * (
@@ -259,7 +262,7 @@ class _RightWall(_ZouHeBoundary[ScalarT, VectorT]):
 		self.velocity_profile = velocity_profile
 		self.density_profile = density_profile
 
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step:int) -> None:
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT, time: ScalarT) -> None:
 		x, y0, y1, q = self._x, self._y0, self._y1, self._q
 		velocity_profile = self.velocity_profile
 		density_profile = self.density_profile
@@ -268,11 +271,11 @@ class _RightWall(_ZouHeBoundary[ScalarT, VectorT]):
 			scale = q / (q + u[y0:y1, x, 0])
 			rho[y0:y1, x] = scale * (f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[1, y0:y1, x] + f[5, y0:y1, x] + f[7, y0:y1, x]))
 			if velocity_profile is not None:
-				u[y0:y1, x] = velocity_profile.get(step)[y0:y1, x]
+				u[y0:y1, x] = velocity_profile.get(time)[y0:y1, x]
 			else:
 				u[y0:y1, x] *= 0
 		elif velocity_profile is None:
-			density = density_profile.get(step)[y0:y1, x]
+			density = density_profile.get(time)[y0:y1, x]
 			rho[y0:y1, x] = density
 			u[y0:y1, x, 1] *= 0
 			u[y0:y1, x, 0] = q * (
@@ -309,7 +312,7 @@ class _ConvexCorner(_ZouHeBoundary[ScalarT, VectorT]):
 		self._dst = dst
 		self._src = src
 
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step:int) -> None:  # noqa: ARG002
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT, time: ScalarT) -> None:  # noqa: ARG002
 		f[self._dst, self._ys, self._xs] = f[self._src, self._ys, self._xs]
 
 
@@ -327,7 +330,7 @@ class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 			_CornerOrientation.BOT_RIGHT: self._apply_bot_right,
 		}[orientation]
 
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT, step: int) -> None:  # noqa: ARG002
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT, time: ScalarT) -> None:  # noqa: ARG002
 		for i in range(len(self._ys)):
 			self._apply_single(f, rho, u, self._ys[i], self._xs[i])
 
@@ -336,7 +339,6 @@ class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 		u[y, x, 0] = u[y, x + 1, 0]
 		u[y, x, 1] = u[ y - 1, x, 1]
 		rho[y, x] = rho[y, x + 1]
-
 
 		f[1, y, x] = f[2, y, x] + 2 * rho[y, x] * u[y, x, 0] / (3 * q) # pyright: ignore[reportArgumentType]
 		f[3, y, x] = f[4, y, x] - 2 * rho[y, x] * u[y, x, 1] / (3 * q)
@@ -385,21 +387,18 @@ class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 		f[0, y, x] = rho[y, x] - np.sum(f[1:9, y, x])
 
 
-
-
 class ZouHe(Boundary[ScalarT, VectorT]):
 	_boundaries: list[_ZouHeBoundary]
 	_lattice: DdQqLattice
-	velocity_profile: _VelocityProfile[VectorT]
+	_lbm: LBM
+	velocity_profile: _VelocityProfile[ScalarT, VectorT]
 	density_profile: _DensityProfile[ScalarT, VectorT]
 	geometry: np.ndarray
-	step: int
 
 	def __init__(self, lbm: LBM) -> None:
 		super().__init__(lbm)
 		self._lattice = lbm.lattice
-
-		self.step = 0
+		self._lbm = lbm
 
 		self._boundaries = []
 		self.velocity_profile = _VelocityProfile(lbm)
@@ -468,7 +467,6 @@ class ZouHe(Boundary[ScalarT, VectorT]):
 			if corners.size > 0:
 				self._boundaries.append(_ConcaveCorner(self._lattice.q, corners[0], corners[1], orientation))
 
-	def apply_boundaries(self, f: VectorT, rho: VectorT, u: VectorT) -> None:
+	def apply_boundaries(self, f: VectorT, rho: VectorT, u: VectorT, time: ScalarT) -> None:
 		for boundary in self._boundaries:
-			boundary.apply(f, rho, u, self.step)
-		self.step += 1
+			boundary.apply(f, rho, u, time)

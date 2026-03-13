@@ -22,7 +22,7 @@ class Boundary[ScalarT, VectorT](ABC):
 		pass
 
 	@abstractmethod
-	def apply_boundaries(self, f: VectorT, rho: VectorT, u: VectorT) -> None:
+	def apply_boundaries(self, f: VectorT, rho: VectorT, u: VectorT, time: ScalarT) -> None:
 		pass
 
 
