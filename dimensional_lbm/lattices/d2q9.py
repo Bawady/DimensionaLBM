@@ -24,10 +24,7 @@ class D2Q9(DdQqLattice):
 	dir_y: ClassVar[np.ndarray] = np.array([0, 0, 0, -1, 1, 1, -1, -1, 1], dtype=int)
 
 	def __init__(self, dx: ScalarT, dt: ScalarT) -> None:
-		self.dx = dx
-		self.dt = dt
-
-		self.q = dx / dt
+		super().__init__(dx, dt)
 
 		self.cs = self.dx / (self.dt * np.sqrt(3))
 		self.cs_n2 = self.dt**2 * 3 / self.dx**2

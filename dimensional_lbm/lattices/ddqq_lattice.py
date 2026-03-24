@@ -28,9 +28,11 @@ class DdQqLattice(ABC, Generic[ScalarT, VectorT]):
 	cs_n2: ScalarT
 	cs_n4: ScalarT
 
-	@abstractmethod
 	def __init__(self, dx: ScalarT, dt: ScalarT) -> None:
-		pass
+		self.dx = dx
+		self.dt = dt
+
+		self.q = dx / dt
 
 	@classmethod
 	def __init_subclass(cls, **kwargs) -> None:  # noqa: ANN003 (PEP 487 doesn't provide )

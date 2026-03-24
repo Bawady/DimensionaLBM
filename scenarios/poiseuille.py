@@ -19,10 +19,10 @@ class Poiseuille(Scenario):
 		lbm.width = lbm.us.quantity(80, "m")
 		lbm.height = lbm.us.quantity(20, "m")
 
-		lbm.dx = lbm.us.quantity(1, "m")
-		lbm.dt = lbm.us.quantity(1, "s")
+		dx = lbm.us.quantity(1, "m")
+		dt = lbm.us.quantity(1, "s")
 
-		lbm.lattice = D2Q9(lbm.dx, lbm.dt)
+		lbm.lattice = D2Q9(dx, dt)
 		lbm.bgk_tau = lbm.viscosity_to_bgk_tau(lbm.us.quantity(0.026, "m**2/s"))
 
 		initial_density = lbm.us.quantity(1, "kg/m**3")

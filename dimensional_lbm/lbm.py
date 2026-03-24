@@ -83,7 +83,6 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 	_runs: int
 	_lattice: DdQqLattice
 	_boundary: Boundary
-	_dx: ScalarT
 	_dt: ScalarT
 
 	_bgk_tau: ScalarT
@@ -115,6 +114,12 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 	def lattice(self, lattice: DdQqLattice) -> None:
 		self._lattice = lattice
 
+		if hasattr(self ,"_width"):
+			self._set_lattice_width()
+
+		if hasattr(self ,"_height"):
+			self._set_lattice_height()
+
 		if self._x > 0 and self._y > 0:
 			self._init_lbm_fields()
 
@@ -133,29 +138,12 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 	@property
 	def dx(self) -> ScalarT:
 		"""Lattice spacing (spatial discretization step)."""
-		return self._dx
-
-	@dx.setter
-	def dx(self, dx: ScalarT) -> None:
-		self._dx = dx
-
-		if hasattr(self ,"_width"):
-			self._set_lattice_width()
-
-		if hasattr(self ,"_height"):
-			self._set_lattice_height()
-
-		if hasattr(self ,"_width") and hasattr(self ,"_height") and hasattr(self, "_lattice"):
-			self._init_lbm_fields()
+		return self._lattice.dx
 
 	@property
 	def dt(self) -> ScalarT:
 		"""Time step (temporal discretization step)."""
-		return self._dt
-
-	@dt.setter
-	def dt(self, dt: ScalarT) -> None:
-		self._dt = dt
+		return self._lattice.dt
 
 	@property
 	def width(self) -> ScalarT:
@@ -163,19 +151,27 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		return self._width
 
 	def _set_lattice_width(self) -> None:
-		self._x = int(self.us.magnitude(self._width / self._dx))
+		x = int(self.us.magnitude(self._width / self._lattice.dx))
+		if x <= 0:
+			msg = f"'width' of the lattice must be greater 0 but is {x} for the provided domain width of '{self._width}' and dx '{self._lattice.dx}'."
+			raise ValueError(msg)
+		self._x = x
 
 	def _set_lattice_height(self) -> None:
-		self._y = int(self.us.magnitude(self._height / self._dx))
+		y = int(self.us.magnitude(self._height / self._lattice.dx))
+		if y <= 0:
+			msg = f"'height' of the lattice must be greater 0 but is {y} for the provided domain width of '{self._height}' and dx '{self._lattice.dx}'."
+			raise ValueError(msg)
+		self._y = y
 
 	@width.setter
 	def width(self, width: ScalarT) -> None:
 		self._width = width
 
-		if hasattr(self, "_dx"):
+		if hasattr(self, "_lattice"):
 			self._set_lattice_width()
 
-			if hasattr(self, "height") and hasattr(self, "_lattice"):
+			if hasattr(self, "height"):
 				self._init_lbm_fields()
 
 	@property
@@ -185,12 +181,16 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 
 	@height.setter
 	def height(self, height: ScalarT) -> None:
+		if self.us.magnitude(height) <= 0:
+			msg = f"The 'height' of the simulation domain must be greater 0 but {height} was provided."
+			raise ValueError(msg)
+
 		self._height = height
 
-		if hasattr(self, "_dx"):
+		if hasattr(self, "_lattice"):
 			self._set_lattice_height()
 
-			if hasattr(self, "width") and hasattr(self, "_lattice"):
+			if hasattr(self, "width"):
 				self._init_lbm_fields()
 
 	@property
@@ -304,7 +304,7 @@ class LBM(Generic[ModeT, ScalarT, VectorT]):
 		Raises:
 			ValueError: If any required parameter is not set.
 		"""
-		required_properties = ["_dx", "_dt", "_lattice", "_width", "_height"]
+		required_properties = ["_lattice", "_width", "_height"]
 
 		for req_prop in required_properties:
 			if not getattr(self, req_prop):

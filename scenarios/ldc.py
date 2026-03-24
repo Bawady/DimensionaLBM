@@ -14,13 +14,13 @@ from scenarios.scenario import Scenario
 class LidDrivenCavity(Scenario):
 
 	def define_scenario(self, lbm: LBM) -> None:
-		lbm.dx = lbm.us.quantity(1, "mm")
-		lbm.dt = lbm.us.quantity(1, "us")
+		dx = lbm.us.quantity(1, "mm")
+		dt = lbm.us.quantity(1, "us")
 
 		lbm.width = lbm.us.quantity(100, "mm")
 		lbm.height = lbm.us.quantity(150, "mm")
 
-		lbm.lattice = D2Q9(lbm.dx, lbm.dt)
+		lbm.lattice = D2Q9(dx, dt)
 
 		reynolds = 100
 		lbm.bgk_tau = lbm.viscosity_to_bgk_tau(lbm.us.quantity(250, "m/s") * lbm.width / reynolds)
