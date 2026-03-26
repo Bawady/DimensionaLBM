@@ -72,7 +72,7 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 	def quantity(self, value: VectorMagnitude, unit: str) -> VectorT: ...
 
 	def quantity(self, value: float | np.ndarray, unit: str) -> Quantity:
-		"""Return the specified unit afflicted quantity converted to the the unit system's conversion mode."""
+		"""Return the specified unit carrying quantity converted to the the unit system's conversion mode."""
 		if isinstance(self.__mode, MagnitudeOnly):
 			return value
 

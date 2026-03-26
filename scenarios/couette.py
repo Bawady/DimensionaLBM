@@ -21,8 +21,9 @@ class Couette(Scenario[BGKLBM]):
 		dt = lbm.us.quantity(1, "s")
 		lbm.lattice = D2Q9(dx, dt)
 
+		viscosity = lbm.us.quantity(0.5, "m**2/s")
+		lbm.tau = tau_from_viscosity(viscosity, lbm.lattice)
 		lbm.density[:, :] = lbm.us.quantity(1, "kg/m**3")
-		lbm.tau = tau_from_viscosity(lbm.us.quantity(0.5, "m**2/s"), lbm.lattice)
 
 		lbm.stream = lbm.stream_periodic
 		lbm.boundary = ZouHe(lbm)
@@ -42,8 +43,6 @@ class Couette(Scenario[BGKLBM]):
 		plt.show()
 
 if __name__ == "__main__":
-	characteristic_quantities: list[ScalarQuantityDefinition] = [(1, "m"), (1, "s"), (2, "kg/m**3")]
-
-	sim = Couette(BGKLBM, characteristic_quantities, conversion_mode=Dimensional)
+	sim = Couette(BGKLBM)
 	sim.run(500, dump_period=50, dump_dir=Path("test/couette"))
 
