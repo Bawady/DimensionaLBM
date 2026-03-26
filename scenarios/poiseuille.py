@@ -16,7 +16,7 @@ from scenarios.scenario import Scenario
 
 class Poiseuille(Scenario[BGKLBM]):
 
-	def define_scenario(self, lbm: BGKLBM) -> None:
+	def define(self, lbm: BGKLBM) -> None:
 		lbm.width = lbm.us.quantity(80, "m")
 		lbm.height = lbm.us.quantity(20, "m")
 

@@ -31,13 +31,13 @@ class Scenario(ABC, Generic[T]):
 
 		self._lbm = self._create(lbm, conversion_mode=mode)
 
-		self.define_scenario(self._lbm)
+		self.define(self._lbm)
 		self._lbm.check_parameters_set()
 		self._lbm.initialize_populations()
 		self._lbm.boundary.setup()
 
 	@abstractmethod
-	def define_scenario(self, lbm: T) -> None:
+	def define(self, lbm: T) -> None:
 		pass
 
 	def run(self, runs: int, dump_period: int=1, dump_dir: pathlib.Path=pathlib.Path(".")) -> None:

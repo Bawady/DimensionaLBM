@@ -90,7 +90,7 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 			self._set_lattice_height()
 
 		if self._x > 0 and self._y > 0:
-			self._init_lbm_fields()
+			self.initialize_fields()
 
 	@property
 	def boundary(self) -> Boundary:
@@ -127,7 +127,7 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 			self._set_lattice_width()
 
 			if hasattr(self, "height"):
-				self._init_lbm_fields()
+				self.initialize_fields()
 
 	@property
 	def height(self) -> ScalarT:
@@ -146,7 +146,7 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 			self._set_lattice_height()
 
 			if hasattr(self, "width"):
-				self._init_lbm_fields()
+				self.initialize_fields()
 
 	def __init__(self) -> None:
 		"""Initialize the LBM simulation with default values."""
@@ -245,7 +245,7 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 		"""
 		self.us = us
 
-	def _init_lbm_fields(self) -> None:
+	def initialize_fields(self) -> None:
 		self.f = self.us.quantity(np.zeros((self._lattice.Q, self._y, self._x), dtype=np.float64), "kg/m**3")
 		self.feq = self.us.quantity(np.zeros((self._lattice.Q, self._y, self._x), dtype=np.float64), "kg/m**3")
 		self.fcoll = self.us.quantity(np.zeros((self._lattice.Q, self._y, self._x), dtype=np.float64), "kg/m**3")

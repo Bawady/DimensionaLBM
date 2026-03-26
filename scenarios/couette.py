@@ -13,7 +13,7 @@ from scenarios.scenario import Scenario
 
 
 class Couette(Scenario[BGKLBM]):
-	def define_scenario(self, lbm: BGKLBM) -> None:
+	def define(self, lbm: BGKLBM) -> None:
 		lbm.width = lbm.us.quantity(50, "m")
 		lbm.height = lbm.us.quantity(20, "m")
 
@@ -27,14 +27,14 @@ class Couette(Scenario[BGKLBM]):
 		lbm.stream = lbm.stream_periodic
 		lbm.boundary = ZouHe(lbm)
 
-		max_speed = lbm.lattice.q
+		self.max_speed = lbm.us.quantity(0.2, "m/s")
 		for x in range(lbm.x):
-			lbm.boundary.velocity_profile[0, x] = max_speed * np.array([1, 0])
+			lbm.boundary.velocity_profile[0, x] = self.max_speed * np.array([1, 0])
 			lbm.boundary.geometry[-1, x] = 1
 
 	def post_run(self, lbm: BGKLBM) -> None:
 		y_ind = np.arange(lbm.y)
-		analytical = lbm.lattice.q * (1 - 1 / (lbm.y - 1) * y_ind)
+		analytical = self.max_speed * (1 - 1 / (lbm.y - 1) * y_ind)
 		data = lbm.u[:, lbm.x//2, 0]
 
 		plt.plot(y_ind, data)
