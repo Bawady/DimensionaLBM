@@ -1,17 +1,18 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Generic
 
 import numpy as np
 from PIL import Image
 
+from dimensional_lbm.unit_system_if import ScalarT, VectorT
+
 if TYPE_CHECKING:
 	from dimensional_lbm.lbm import LBM
-	from dimensional_lbm.unit_system_if import ScalarT, VectorT  # noqa: F401 (maybe for a future Boundary implementation)
 
 
-class Boundary[ScalarT, VectorT](ABC):
+class Boundary(ABC, Generic[ScalarT, VectorT]):
 
 	@abstractmethod
 	def __init__(self, lbm : LBM) -> None:

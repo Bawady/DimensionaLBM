@@ -44,6 +44,7 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 		"""Initialize an empty unit system."""
 		self.__characteristic_quantities = []
 		self.__ureg = cast("pint.UnitRegistry", pint.get_application_registry())
+		self.__ureg.setup_matplotlib(True)
 		self.__mode = _mode if _mode else Dimensional()
 
 	@overload
@@ -79,7 +80,7 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 		if isinstance(self.__mode, Dimensional):
 			return q
 		if isinstance(self.__mode, NonDimensional):
-			return self.__non_dimensionalize(q)
+			return self._non_dimensionalize(q)
 
 		msg: str = f"Unknown conversion mode {self.__mode}"
 		raise ValueError(msg)
@@ -156,18 +157,18 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 		return q.magnitude
 
 	@overload
-	def __non_dimensionalize(self, q: float) -> float: ...
+	def _non_dimensionalize(self, q: float) -> float: ...
 
 	@overload
-	def __non_dimensionalize(self, q: np.ndarray) -> np.ndarray: ...
+	def _non_dimensionalize(self, q: np.ndarray) -> np.ndarray: ...
 
 	@overload
-	def __non_dimensionalize(self, q: PlainQuantity[float]) -> float: ...
+	def _non_dimensionalize(self, q: PlainQuantity[float]) -> float: ...
 
 	@overload
-	def __non_dimensionalize(self, q: NumpyQuantity) -> np.ndarray: ...
+	def _non_dimensionalize(self, q: NumpyQuantity) -> np.ndarray: ...
 
-	def __non_dimensionalize(self, q: Quantity) -> float | np.ndarray:
+	def _non_dimensionalize(self, q: Quantity) -> float | np.ndarray:
 		if isinstance(q, (int, float, np.ndarray)):
 			return q
 
@@ -217,3 +218,30 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 		if isinstance(x, (int, float, np.ndarray)):
 			return x
 		return x.to(unit)
+
+	@overload
+	def dim(self, x: float, unit: str) -> PlainQuantity[float]: ...
+
+	@overload
+	def dim(self, x: np.ndarray, unit: str) -> NumpyQuantity: ...
+
+	@overload
+	def dim(self, x: PlainQuantity[float], unit: str) ->PlainQuantity[float]: ...
+
+	@overload
+	def dim(self, x: PlainQuantity[int], unit: str) ->PlainQuantity[int]: ...
+
+	@overload
+	def dim(self, x: NumpyQuantity, unit: str) -> NumpyQuantity: ...
+
+	def dim(self, x: Quantity, unit: str) -> Quantity:
+		"""Dimensionalize x to the given unit (already dimensional quantities are checked to have the given unit's dimensionality)."""
+		if isinstance(x, (int, float, np.ndarray)):
+			target = self.__ureg.Quantity(1, unit)
+			return self.__apply_pi_theorem(self.__ureg.Quantity(x, "1"), 1 / target)
+
+		if x.dimensionality != self.__ureg.Quantity(1, unit).dimensionality:
+			extra_msg = "Attempted to dimensionalize already dimensional quantity to different dimensionality."
+			raise pint.DimensionalityError(x.units, unit, extra_msg=extra_msg)
+		return x
+

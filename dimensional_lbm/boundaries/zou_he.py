@@ -7,12 +7,14 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 
 import numpy as np
 from numpy import ndarray
+
 # TODO: These imports should not be necessary here
 from pint.facets.numpy.quantity import NumpyQuantity
 from pint.facets.plain import PlainQuantity
 
 from dimensional_lbm.boundaries.boundary import Boundary
 from dimensional_lbm.boundaries.wall_detector import WallDetector
+from dimensional_lbm.conversion_mode import Dimensional
 from dimensional_lbm.unit_system_if import ScalarT, VectorT
 
 if TYPE_CHECKING:
@@ -44,7 +46,7 @@ class _VelocityProfile(Generic[ScalarT, VectorT]):
 		if callable(value):
 			self._callbacks.append((key, value))
 		elif isinstance(self._profile, NumpyQuantity) and isinstance(value, NumpyQuantity):
-			self._profile[key] = self._lbm.us.to_unit(value, str(self._profile.units)).magnitude
+			self._profile[key] = self._lbm.us.to_unit(value, str(self._profile.units))
 		else:
 			self._profile[key] = value
 
@@ -53,6 +55,9 @@ class _VelocityProfile(Generic[ScalarT, VectorT]):
 			for cb in self._callbacks:
 				self._profile[cb[0]] = cb[-1](time)
 			self._last_time = time
+#			print((self._profile[0,0,0] / self._lbm.us.quantity(10, "mm") * self._lbm.us.quantity(4, "us")).to_base_units())
+#
+# 			print(self._profile[0,0,0])
 		return self._profile
 
 	@property
@@ -79,7 +84,7 @@ class _DensityProfile(Generic[ScalarT, VectorT]):
 		if callable(value):
 			self._callbacks.append((key, value))
 		elif isinstance(self._profile, NumpyQuantity) and isinstance(value, PlainQuantity):
-			self._profile[key] = self._lbm.us.to_unit(value, str(self._profile.units)).magnitude
+			self._profile[key] = self._lbm.us.to_unit(value, str(self._profile.units))
 		else:
 			self._profile[key] = value
 

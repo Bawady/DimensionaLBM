@@ -4,6 +4,7 @@ import pathlib
 import matplotlib.pyplot as plt
 import numpy as np
 
+from dimensional_lbm.bgk_lbm import BGKLBM, tau_from_viscosity
 from dimensional_lbm.boundaries.boundary import load_geometry
 from dimensional_lbm.boundaries.zou_he import ZouHe
 from dimensional_lbm.conversion_mode import Dimensional, NonDimensional
@@ -13,9 +14,9 @@ from dimensional_lbm.unit_system_if import ScalarQuantityDefinition
 from scenarios.scenario import Scenario
 
 
-class Poiseuille(Scenario):
+class Poiseuille(Scenario[BGKLBM]):
 
-	def define_scenario(self, lbm: LBM) -> None:
+	def define_scenario(self, lbm: BGKLBM) -> None:
 		lbm.width = lbm.us.quantity(80, "m")
 		lbm.height = lbm.us.quantity(20, "m")
 
@@ -23,7 +24,7 @@ class Poiseuille(Scenario):
 		dt = lbm.us.quantity(1, "s")
 
 		lbm.lattice = D2Q9(dx, dt)
-		lbm.bgk_tau = lbm.viscosity_to_bgk_tau(lbm.us.quantity(0.026, "m**2/s"))
+		lbm.tau = tau_from_viscosity(lbm.us.quantity(0.026, "m**2/s"), lbm.lattice)
 
 		initial_density = lbm.us.quantity(1, "kg/m**3")
 		lbm.density[:, :] = initial_density
@@ -52,5 +53,5 @@ class Poiseuille(Scenario):
 if __name__ == "__main__":
 	characteristic_quantities: list[ScalarQuantityDefinition] = [(1, "m"), (1, "s"), (1, "kg/m**3")]
 
-	sim = Poiseuille(characteristic_quantities, conversion_mode=NonDimensional)
+	sim = Poiseuille(BGKLBM, characteristic_quantities, conversion_mode=NonDimensional)
 	sim.run(5000, 100, pathlib.Path("test/poiseuille"))
