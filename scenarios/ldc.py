@@ -25,7 +25,7 @@ class LidDrivenCavity(Scenario[BGKLBM]):
 		initial_density = lbm.us.quantity(1, "kg/m**3")
 		lbm.density[:, :] = initial_density
 
-		reynolds = random.randint(100, 1000)
+		reynolds = 100
 		viscosity = lbm.us.quantity(0.256, "m/s") * lbm.width / reynolds
 		lbm.tau = tau_from_viscosity(viscosity, lbm.lattice)
 
