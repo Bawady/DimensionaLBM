@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-from dimensional_lbm.bgk_lbm import BGKLBM, tau_from_viscosity
+from dimensional_lbm.bgk_lbm import BGKLBM, from_viscosity
 from dimensional_lbm.boundaries.zou_he import ZouHe
 from dimensional_lbm.conversion_mode import Dimensional, NonDimensional
 from dimensional_lbm.lattices.d2q9 import D2Q9
@@ -27,7 +27,7 @@ class LidDrivenCavity(Scenario[BGKLBM]):
 
 		reynolds = 100
 		viscosity = lbm.us.quantity(0.256, "m/s") * lbm.width / reynolds
-		lbm.tau = tau_from_viscosity(viscosity, lbm.lattice)
+		lbm.tau = from_viscosity(viscosity, lbm.lattice)
 
 		lbm.boundary = ZouHe(lbm)
 		lbm.boundary.geometry[:, 0] = 1

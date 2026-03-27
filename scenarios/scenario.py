@@ -21,7 +21,8 @@ class Scenario(ABC, Generic[T]):
 	characteristic_quantities: list[ScalarQuantityDefinition] | None = None
 
 	def __init__(
-		self, lbm: type[T], characteristic_quantities: list[ScalarQuantityDefinition] | None = None, conversion_mode: type[ConversionMode] | None = None
+		self, lbm: type[T], characteristic_quantities: list[ScalarQuantityDefinition] | None = None,
+		conversion_mode: type[ConversionMode] | None = None
 	) -> None:
 		mode = conversion_mode
 		self.characteristic_quantities = characteristic_quantities

@@ -58,14 +58,14 @@ class DdQqLattice(ABC, Generic[ScalarT, VectorT]):
 			msg: str = f"{cls.__name__} must set class variable 'dir_y' to one dimensional array of length {cls.Q}"
 			raise TypeError(msg)
 
-	#######################################
-	#####          Streaming          #####
-	#######################################
-
 	@abstractmethod
 	def stream_periodic(self, f_new: VectorT, f_old: VectorT) -> None:
 		pass
 
 	@abstractmethod
 	def stream(self, f_new: VectorT, f_old: VectorT) -> None:
+		pass
+
+	@abstractmethod
+	def equilibrium(self, density: VectorT, velocity: VectorT, eq: VectorT) -> None:
 		pass

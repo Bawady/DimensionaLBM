@@ -3,7 +3,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from dimensional_lbm.bgk_lbm import BGKLBM, tau_from_viscosity
+from dimensional_lbm.bgk_lbm import BGKLBM, from_viscosity
 from dimensional_lbm.boundaries.zou_he import ZouHe
 from dimensional_lbm.conversion_mode import Dimensional, NonDimensional
 from dimensional_lbm.lattices.d2q9 import D2Q9

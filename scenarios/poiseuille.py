@@ -4,7 +4,7 @@ import pathlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-from dimensional_lbm.bgk_lbm import BGKLBM, tau_from_viscosity
+from dimensional_lbm.bgk_lbm import BGKLBM, from_viscosity
 from dimensional_lbm.boundaries.boundary import load_geometry
 from dimensional_lbm.boundaries.zou_he import ZouHe
 from dimensional_lbm.conversion_mode import Dimensional, NonDimensional
@@ -24,7 +24,7 @@ class Poiseuille(Scenario[BGKLBM]):
 		dt = lbm.us.quantity(1, "s")
 
 		lbm.lattice = D2Q9(dx, dt)
-		lbm.tau = tau_from_viscosity(lbm.us.quantity(0.026, "m**2/s"), lbm.lattice)
+		lbm.tau = from_viscosity(lbm.us.quantity(0.026, "m**2/s"), lbm.lattice)
 
 		initial_density = lbm.us.quantity(1, "kg/m**3")
 		lbm.density[:, :] = initial_density

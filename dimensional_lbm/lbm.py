@@ -165,7 +165,7 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 			6. Increment run counter
 		"""
 		self.moments()
-		self.equilibrium()
+		self.lattice.equilibrium(self.density, self.u, self.feq)
 		self.collide()
 		self.stream()
 		self._boundary.apply_boundaries(self.f, self.density, self.u, self._runs * self.dt)
@@ -177,7 +177,7 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 		Computes the equilibrium distribution based on the current macroscopic
 		fields (density, u) and sets f = f_eq as the initial condition.
 		"""
-		self.equilibrium()
+		self.lattice.equilibrium(self.density, self.u, self.feq)
 		self.f = cast("VectorT", self.feq.copy())
 
 	def check_parameters_set(self) -> None:
@@ -215,10 +215,6 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 		# TODO: make work for arbitrary lattice dimensions
 		self.u[:, :, 0] = self.lattice.q * np.sum(self.lattice.dir_x[:, None, None] * self.f, axis=0) / self.density
 		self.u[:, :, 1] = self.lattice.q * np.sum(self.lattice.dir_y[:, None, None] * self.f, axis=0) / self.density
-
-	@abstractmethod
-	def equilibrium(self) -> None:
-		pass
 
 	@abstractmethod
 	def collide(self) -> None:
