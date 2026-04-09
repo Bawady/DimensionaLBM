@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 import typing
 from abc import ABC, abstractmethod
 from enum import Enum, auto
@@ -13,7 +14,7 @@ from pint.facets.numpy.quantity import NumpyQuantity
 from pint.facets.plain import PlainQuantity
 
 from dimensional_lbm.boundaries.boundary import Boundary
-from dimensional_lbm.boundaries.wall_detector import WallDetector
+from dimensional_lbm.boundaries.wall_detector import WallDetector, img_to_solid
 from dimensional_lbm.conversion_mode import Dimensional
 from dimensional_lbm.unit_system_if import ScalarT, VectorT
 
@@ -368,7 +369,7 @@ class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 	def _apply_top_left(self, f: VectorT, rho: VectorT, u: VectorT, y: int, x: int) -> None:
 		q = self._q
 		u[y, x, 0] = u[y, x + 1, 0]
-		u[y, x, 1] = u[y + 1, y, 1]
+		u[y, x, 1] = u[y + 1, x, 1]
 		rho[y, x] = rho[y, x + 1]
 
 		f[1, y, x] = f[2, y, x] + 2.0 * rho[y, x] * u[y, x, 0] / (3 * q) # pyright: ignore[reportArgumentType]
@@ -409,6 +410,9 @@ class ZouHe(Boundary[ScalarT, VectorT]):
 		self.velocity_profile = _VelocityProfile(lbm)
 		self.density_profile = _DensityProfile(lbm)
 		self.geometry = np.zeros((lbm.y, lbm.x))
+
+	def get_geometry(self) -> np.ndarray:
+		return np.where((self.geometry > 0) & (self.velocity_profile.geometry == 0) & (self.density_profile.geometry == 0), 1, 0)
 
 	def setup(self) -> None:
 		velocity_geometry = self.velocity_profile.geometry

@@ -26,6 +26,10 @@ class Boundary(ABC, Generic[ScalarT, VectorT]):
 	def apply_boundaries(self, f: VectorT, rho: VectorT, u: VectorT, time: ScalarT) -> None:
 		pass
 
+	@abstractmethod
+	def get_geometry(self) -> np.ndarray:
+		pass
+
 
 def load_geometry(geometry_img: str) -> np.ndarray:
 	"""Load B/W image and convert to solid array (black=1, white=0)."""
