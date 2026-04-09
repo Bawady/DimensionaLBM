@@ -154,7 +154,7 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 		"""Get the magnitude of a Quantity."""
 		if isinstance(q, (int, float, np.ndarray)):
 			return q
-		return q.magnitude
+		return q.to_base_units().magnitude
 
 	@overload
 	def _non_dimensionalize(self, q: float) -> float: ...
