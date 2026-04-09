@@ -1,7 +1,7 @@
 [project]
-name = "dimensionalbm"
+name = "DimensionaLBM"
 version = "0.1.0"
-description = "Add your description here"
+description = "A fully dimensional LBM Implementation for Prototyping"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -9,4 +9,7 @@ dependencies = [
     "numpy>=2.4.1",
     "pint>=0.25.2",
     "pre-commit>=4.5.1",
+    "pyright>=1.1.407",
+    "ruff>=0.14.9",
 ]
+license = "MIT"
