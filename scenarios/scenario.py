@@ -59,12 +59,13 @@ class Scenario(ABC, Generic[T]):
 		density_rgba = cmap(density_mag / np.max(density_mag))
 
 		vel_abs = np.sqrt(velocity_mag[:, :, 0] ** 2 + velocity_mag[:, :, 1] ** 2)
-		vel_rgba = cmap(vel_abs / np.max(vel_abs)) if np.max(vel_abs) > 0 else cmap(vel_abs)
+		vel_rgba = cmap(vel_abs / lbm.lattice.q)
 
 		dump_data = {"density": density_rgba, "velocity": vel_rgba}
 
 		for name, rgba in dump_data.items():
-			plt_img.imsave(dump_dir_p / f"{name}_{lbm._runs}.png", rgba, dpi=600)
+			rgba_masked = np.where((lbm.boundary.get_geometry() > 0)[..., np.newaxis], (0, 0, 0, 1), rgba)
+			plt_img.imsave(dump_dir_p / f"{name}_{lbm._runs}.png", rgba_masked, dpi=600)
 
 	def post_run(self, lbm: T) -> None:
 		pass
