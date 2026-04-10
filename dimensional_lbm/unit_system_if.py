@@ -3,7 +3,7 @@
 from typing import TypeVar, cast, overload
 
 import numpy as np
-import pint
+import pintrs
 from pint.facets.numpy.quantity import NumpyQuantity
 from pint.facets.plain import PlainQuantity
 
@@ -32,7 +32,7 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 	"""A generic, fully typed, unit system for different conversion modes."""
 
 	__characteristic_quantities: list[PintQuantityScalar]
-	__ureg: pint.UnitRegistry
+	__ureg: pintrs.UnitRegistry
 	__mode: ConversionMode
 
 	@property
@@ -43,7 +43,7 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 	def __init__(self, _mode: ConversionMode | None = None) -> None:
 		"""Initialize an empty unit system."""
 		self.__characteristic_quantities = []
-		self.__ureg = cast("pint.UnitRegistry", pint.get_application_registry())
+		self.__ureg = cast("pintrs.UnitRegistry", pintrs.get_application_registry())
 		self.__ureg.setup_matplotlib(True)
 		self.__mode = _mode if _mode else Dimensional()
 
@@ -242,6 +242,6 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 
 		if x.dimensionality != self.__ureg.Quantity(1, unit).dimensionality:
 			extra_msg = "Attempted to dimensionalize already dimensional quantity to different dimensionality."
-			raise pint.DimensionalityError(x.units, unit, extra_msg=extra_msg)
+			raise pintrs.DimensionalityError(x.units, unit, extra_msg=extra_msg)
 		return x
 

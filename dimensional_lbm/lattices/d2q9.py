@@ -1,7 +1,7 @@
 from typing import ClassVar, cast
 
 import numpy as np
-import pint
+import pintrs as pint
 
 from dimensional_lbm.unit_system_if import ScalarT, VectorT
 

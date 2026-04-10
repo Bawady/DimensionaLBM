@@ -11,5 +11,6 @@ dependencies = [
     "pre-commit>=4.5.1",
     "pyright>=1.1.407",
     "ruff>=0.14.9",
+    "pintrs>=0.3.1"
 ]
 license = "MIT"
