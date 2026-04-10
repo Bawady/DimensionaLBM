@@ -80,7 +80,7 @@ class WallDetector:
 				false corners at junctions between boundary types) but are not
 				themselves detected as walls or corners.
 		"""
-		if isinstance(solid, pint.Quantity):
+		if isinstance(solid, pints.Quantity):
 			solid = solid.magnitude
 
 		solid = solid.astype(np.int32)
