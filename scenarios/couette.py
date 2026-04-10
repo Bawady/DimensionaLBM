@@ -22,7 +22,7 @@ class Couette(Scenario[BGKLBM]):
 		lbm.lattice = D2Q9(dx, dt)
 
 		viscosity = lbm.us.quantity(0.5, "m**2/s")
-		lbm.tau = tau_from_viscosity(viscosity, lbm.lattice)
+		lbm.tau = from_viscosity(viscosity, lbm.lattice)
 		lbm.density[:, :] = lbm.us.quantity(1, "kg/m**3")
 
 		lbm.stream = lbm.stream_periodic
