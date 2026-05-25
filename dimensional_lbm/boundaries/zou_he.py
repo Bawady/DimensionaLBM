@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
-import typing
 from abc import ABC, abstractmethod
 from enum import Enum, auto
 from typing import TYPE_CHECKING, Any, Generic, cast
@@ -14,8 +12,7 @@ from pint.facets.numpy.quantity import NumpyQuantity
 from pint.facets.plain import PlainQuantity
 
 from dimensional_lbm.boundaries.boundary import Boundary
-from dimensional_lbm.boundaries.wall_detector import WallDetector, img_to_solid
-from dimensional_lbm.conversion_mode import Dimensional
+from dimensional_lbm.boundaries.wall_detector import WallDetector
 from dimensional_lbm.unit_system_if import ScalarT, VectorT
 
 if TYPE_CHECKING:

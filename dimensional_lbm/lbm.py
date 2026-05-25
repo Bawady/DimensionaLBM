@@ -14,14 +14,14 @@ The LBM algorithm follows the standard workflow:
 """
 
 from abc import ABC, abstractmethod
-from typing import ClassVar, Generic, cast
+from typing import Generic, cast
 
 import numpy as np
 
 from dimensional_lbm.boundaries.boundary import Boundary
 from dimensional_lbm.conversion_mode import ModeT
 from dimensional_lbm.lattices.ddqq_lattice import DdQqLattice
-from dimensional_lbm.unit_system_if import ScalarQuantityDefinition, ScalarT, UnitSystem, VectorT
+from dimensional_lbm.unit_system_if import ScalarT, UnitSystem, VectorT
 
 
 class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
