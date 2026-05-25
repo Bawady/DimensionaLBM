@@ -6,6 +6,7 @@ from typing import Generic, TypeVar
 import matplotlib.image as plt_img
 import numpy as np
 from matplotlib import cm
+from unit_jit import unit_jit
 
 from dimensional_lbm.conversion_mode import ConversionMode, Dimensional, MagnitudeOnly, NonDimensional
 from dimensional_lbm.lbm import LBM
@@ -17,6 +18,7 @@ from dimensional_lbm.unit_system_if import (
 T = TypeVar("T", bound=LBM)
 
 
+@unit_jit
 def _jit_steps(lbm: LBM, n: int) -> None:
 	for _ in range(n):
 		lbm.single_step()
