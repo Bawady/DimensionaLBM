@@ -45,7 +45,7 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 		self.__characteristic_quantities = []
 		self.__ureg = cast("pintrs.UnitRegistry", pintrs.get_application_registry())
 		self.__ureg.setup_matplotlib(True)
-		self.__mode = _mode if _mode else Dimensional()
+		self.__mode = _mode or Dimensional()
 
 	@overload
 	def quantity(self: "UnitSystem[Dimensional]", value: float, unit: str) -> PlainQuantity[float]: ...

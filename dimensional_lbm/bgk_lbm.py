@@ -1,6 +1,4 @@
-from typing import Generic, cast
-
-import numpy as np
+from typing import cast
 
 from dimensional_lbm.conversion_mode import ModeT
 from dimensional_lbm.lattices.ddqq_lattice import DdQqLattice

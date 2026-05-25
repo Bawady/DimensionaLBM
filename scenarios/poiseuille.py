@@ -7,7 +7,7 @@ import numpy as np
 from dimensional_lbm.bgk_lbm import BGKLBM, from_viscosity
 from dimensional_lbm.boundaries.boundary import load_geometry
 from dimensional_lbm.boundaries.zou_he import ZouHe
-from dimensional_lbm.conversion_mode import Dimensional, NonDimensional
+from dimensional_lbm.conversion_mode import NonDimensional
 from dimensional_lbm.lattices.d2q9 import D2Q9
 from dimensional_lbm.lbm import LBM
 from dimensional_lbm.unit_system_if import ScalarQuantityDefinition
@@ -15,7 +15,6 @@ from scenarios.scenario import Scenario
 
 
 class Poiseuille(Scenario[BGKLBM]):
-
 	def define(self, lbm: BGKLBM) -> None:
 		lbm.width = lbm.us.quantity(80, "m")
 		lbm.height = lbm.us.quantity(20, "m")
@@ -35,15 +34,15 @@ class Poiseuille(Scenario[BGKLBM]):
 		max_speed = lbm.us.quantity(0.8, "m/s")
 		for y in range(lbm.y):
 			# Poiseuille source velocity profile
-			inlet_speed = max_speed / (lbm.y - 1)**2 * y * (lbm.y - 1 - y)
-			lbm.boundary.velocity_profile[y, 0] = lambda step, speed=inlet_speed: speed * (1 - math.exp(-step**2 / (2 * 800))) * np.array([1, 0])
+			inlet_speed = lbm.us.magnitude(max_speed / (lbm.y - 1) ** 2 * y * (lbm.y - 1 - y))
+			lbm.boundary.velocity_profile[y, 0] = lambda step, speed=inlet_speed: speed * (1 - math.exp(-(step**2) / (2 * 800))) * np.array([1, 0])
 			# Poiseuille sink density profile
 			lbm.boundary.density_profile[y, -1] = initial_density
 
-	def post_run (self, lbm: LBM) -> None:
+	def post_run(self, lbm: LBM) -> None:
 		y_ind = np.arange(lbm.y)
-		ref = 4 / (lbm.y-1)**2*y_ind * (lbm.y-1-y_ind)
-		data = lbm.u[:, lbm.x//2, 0] / lbm.us.quantity(0.2, "m/s")
+		ref = 4 / (lbm.y - 1) ** 2 * y_ind * (lbm.y - 1 - y_ind)
+		data = lbm.u[:, lbm.x // 2, 0] / lbm.us.quantity(0.2, "m/s")
 
 		plt.plot(ref, y_ind, label="ref")
 		plt.plot(data, y_ind, label="lbm", marker="o")
