@@ -17,11 +17,6 @@ from dimensional_lbm.unit_system_if import (
 T = TypeVar("T", bound=LBM)
 
 
-def _jit_steps(lbm: LBM, n: int) -> None:
-	for _ in range(n):
-		lbm.single_step()
-
-
 class Scenario(ABC, Generic[T]):
 	_lbm: T
 	characteristic_quantities: list[ScalarQuantityDefinition] | None = None
@@ -50,10 +45,11 @@ class Scenario(ABC, Generic[T]):
 	def define(self, lbm: T) -> None:
 		pass
 
-	def run(self, runs: int, dump_period: int = 1, dump_dir: pathlib.Path = pathlib.Path()) -> None:
-		for batch_start in range(0, runs, dump_period):
-			self.dump(self._lbm, dump_dir)
-			_jit_steps(self._lbm, min(dump_period, runs - batch_start))
+	def run(self, runs: int, dump_period: int=1, dump_dir: pathlib.Path=pathlib.Path()) -> None:
+		for i in range(runs):
+			if i % dump_period == 0 or i == runs-1:
+				self.dump(self._lbm, dump_dir)
+			self._lbm.single_step()
 		self.post_run(self._lbm)
 
 	def dump(self, lbm: T, dump_dir: os.PathLike) -> None:
