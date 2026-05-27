@@ -28,16 +28,18 @@ class Poiseuille(Scenario[BGKLBM]):
 		initial_density = lbm.us.quantity(1, "kg/m**3")
 		lbm.density[:, :] = initial_density
 
-		lbm.boundary = ZouHe(lbm)
-		lbm.boundary.geometry = load_geometry("geometries/pipe.png")
+		zou_he = ZouHe(lbm)
+		zou_he.geometry = load_geometry("geometries/pipe.png")
 
 		max_speed = lbm.us.quantity(0.8, "m/s")
 		for y in range(lbm.y):
 			# Poiseuille source velocity profile
 			inlet_speed = lbm.us.magnitude(max_speed / (lbm.y - 1) ** 2 * y * (lbm.y - 1 - y))
-			lbm.boundary.velocity_profile[y, 0] = lambda step, speed=inlet_speed: speed * (1 - math.exp(-(step**2) / (2 * 800))) * np.array([1, 0])
+			zou_he.velocity_profile[y, 0] = lambda step, speed=inlet_speed: speed * (1 - math.exp(-(step**2) / (2 * 800))) * np.array([1, 0])
 			# Poiseuille sink density profile
-			lbm.boundary.density_profile[y, -1] = initial_density
+			zou_he.density_profile[y, -1] = initial_density
+
+		lbm.boundaries += zou_he
 
 	def post_run(self, lbm: LBM) -> None:
 		y_ind = np.arange(lbm.y)

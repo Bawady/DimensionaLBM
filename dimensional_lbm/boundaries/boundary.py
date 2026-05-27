@@ -9,7 +9,24 @@ from PIL import Image
 from dimensional_lbm.unit_system_if import ScalarT, VectorT
 
 if TYPE_CHECKING:
+	from collections.abc import Iterator
+
 	from dimensional_lbm.lbm import LBM
+
+
+class BoundaryCollection(list["Boundary"]):
+	"""List of boundaries that supports ``lbm.boundaries += boundary`` without explicit keys."""
+
+	def __add__(self, boundary: Boundary) -> BoundaryCollection:  # type: ignore [override]
+		self.append(boundary)
+		return self
+
+	def __iadd__(self, boundary: Boundary) -> BoundaryCollection:  # type: ignore[override]
+		self.append(boundary)
+		return self
+
+	def __iter__(self) -> Iterator[Boundary]:
+		return super().__iter__()
 
 
 class Boundary(ABC, Generic[ScalarT, VectorT]):
