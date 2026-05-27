@@ -58,8 +58,8 @@ class Scenario(ABC, Generic[T]):
 			_jit_steps(self._lbm, min(dump_period, runs - batch_start))
 		self.post_run(self._lbm)
 
-	def dump(self, lbm: T, dir: os.PathLike) -> None:
-		dump_dir_p = pathlib.Path(dir)
+	def dump(self, lbm: T, dump_dir: os.PathLike) -> None:
+		dump_dir_p = pathlib.Path(dump_dir)
 		dump_dir_p.mkdir(exist_ok=True)
 
 		density_mag = lbm.us.magnitude(lbm.us.dim(lbm.density, "kg/m**3"))
@@ -74,7 +74,7 @@ class Scenario(ABC, Generic[T]):
 		dump_data = {"density": density_rgba, "velocity": vel_rgba}
 
 		for name, rgba in dump_data.items():
-			rgba_masked = np.where((lbm.boundary.get_geometry() > 0)[..., np.newaxis], (0, 0, 0, 1), rgba)
+			rgba_masked = np.where((lbm.boundary_geometry() > 0)[..., np.newaxis], (0, 0, 0, 1), rgba)
 			plt_img.imsave(dump_dir_p / f"{name}_{lbm._runs}.png", rgba_masked, dpi=600)
 
 	def post_run(self, lbm: T) -> None:
