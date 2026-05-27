@@ -105,7 +105,6 @@ class ZeroGradient(Boundary[ScalarT, VectorT]):
 		DOWN  = 3
 
 	def __init__(self, lbm: LBM) -> None:
-		super().__init__(lbm)
 		self._lattice = lbm.lattice
 		self._lbm = lbm
 
