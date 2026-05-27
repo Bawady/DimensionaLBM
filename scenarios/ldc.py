@@ -27,10 +27,10 @@ class LidDrivenCavity(Scenario[BGKLBM]):
 		viscosity = lbm.us.quantity(0.256, "m/s") * lbm.width / reynolds
 		lbm.tau = from_viscosity(viscosity, lbm.lattice)
 
-		lbm.boundary = ZouHe(lbm)
-		lbm.boundary.geometry[:, 0] = 1
-		lbm.boundary.geometry[:, -1] = 1
-		lbm.boundary.geometry[-1, :] = 1
+		zou_he = ZouHe(lbm)
+		zou_he.geometry[:, 0] = 1
+		zou_he.geometry[:, -1] = 1
+		zou_he.geometry[-1, :] = 1
 
 		self.max_speed = lbm.us.quantity(0.256, "m/s")
 		t_ramp = lbm.us.quantity(30, "us")
@@ -38,9 +38,11 @@ class LidDrivenCavity(Scenario[BGKLBM]):
 		t_ramp_si = lbm.us.magnitude(t_ramp)
 		normalize = lbm.us.magnitude
 		for x in range(lbm.x):
-			lbm.boundary.velocity_profile[0, x] = lambda step, s=max_speed_si, t=t_ramp_si, n=normalize: (
+			zou_he.velocity_profile[0, x] = lambda step, s=max_speed_si, t=t_ramp_si, n=normalize: (
 				s * (1 - math.exp(-((n(step) / t) ** 2))) * np.array([1, 0])
 			)
+
+		lbm.boundaries += zou_he
 
 
 # def post_run(self, lbm: LBM) -> None:

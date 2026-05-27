@@ -23,12 +23,14 @@ class Couette(Scenario[BGKLBM]):
 		lbm.density[:, :] = lbm.us.quantity(1, "kg/m**3")
 
 		lbm.stream = lbm.stream_periodic
-		lbm.boundary = ZouHe(lbm)
+		zou_he = ZouHe(lbm)
 
 		self.max_speed = lbm.us.quantity(0.2, "m/s")
 		for x in range(lbm.x):
-			lbm.boundary.velocity_profile[0, x] = self.max_speed * np.array([1, 0])
-			lbm.boundary.geometry[-1, x] = 1
+			zou_he.velocity_profile[0, x] = self.max_speed * np.array([1, 0])
+			zou_he.geometry[-1, x] = 1
+
+		lbm.boundaries += zou_he
 
 	def post_run(self, lbm: BGKLBM) -> None:
 		y_ind = np.arange(lbm.y)

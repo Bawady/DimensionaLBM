@@ -18,7 +18,7 @@ from typing import Generic, cast
 
 import numpy as np
 
-from dimensional_lbm.boundaries.boundary import Boundary
+from dimensional_lbm.boundaries.boundary import BoundaryCollection
 from dimensional_lbm.conversion_mode import ModeT
 from dimensional_lbm.lattices.ddqq_lattice import DdQqLattice
 from dimensional_lbm.unit_system_if import ScalarT, UnitSystem, VectorT
@@ -61,7 +61,7 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 	_y: int
 	_runs: int
 	_lattice: DdQqLattice
-	_boundary: Boundary
+	boundaries: BoundaryCollection
 	_dt: ScalarT
 
 	@property
@@ -92,17 +92,13 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 		if self._x > 0 and self._y > 0:
 			self.initialize_fields()
 
-	@property
-	def boundary(self) -> Boundary:
-		"""Boundary conditions used for the simulation."""
-		return self._boundary
+	def boundary_geometry(self) -> np.ndarray:
+		geometry = np.zeros_like(self.density)
 
-	@boundary.setter
-	def boundary(self, boundary: Boundary) -> None:
-		if not self.lattice:
-			msg = "Cannot specify the boundary conditions without the lattice being set prior to it."
-			raise ValueError(msg)
-		self._boundary = boundary
+		for boundary in self.boundaries:
+			geometry = np.logical_or(geometry, boundary.get_geometry())
+
+		return geometry
 
 	@property
 	def dx(self) -> ScalarT:
@@ -154,6 +150,8 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 		self._x = 0
 		self._y = 0
 
+		self.boundaries = BoundaryCollection()
+
 	def single_step(self) -> None:
 		"""Execute a single LBM time step.
 
@@ -168,7 +166,8 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 		self.lattice.equilibrium(self.density, self.u, self.feq)
 		self.collide()
 		self.stream()
-		self._boundary.apply_boundaries(self.f, self.density, self.u, self._runs * self.dt)
+		for boundary in self.boundaries:
+			boundary.apply_boundaries(self.f, self.density, self.u, self._runs * self.dt)
 		self._runs += 1
 
 	def initialize_populations(self) -> None:
@@ -193,7 +192,7 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 		Raises:
 			ValueError: If any required parameter is not set.
 		"""
-		required_properties = ["_lattice", "_boundary", "_width", "_height"]
+		required_properties = ["_lattice", "_width", "_height"]
 
 		for req_prop in required_properties:
 			if not getattr(self, req_prop):

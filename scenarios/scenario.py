@@ -45,7 +45,8 @@ class Scenario(ABC, Generic[T]):
 		self.define(self._lbm)
 		self._lbm.check_parameters_set()
 		self._lbm.initialize_populations()
-		self._lbm.boundary.setup()
+		for boundary in self._lbm.boundaries:
+			boundary.setup()
 
 	@abstractmethod
 	def define(self, lbm: T) -> None:
