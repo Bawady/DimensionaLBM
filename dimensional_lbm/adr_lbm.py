@@ -26,8 +26,9 @@ class AdrLBM(LBM[ModeT, ScalarT, VectorT]):
 	Uses periodic streaming — no boundary conditions are required.
 	"""
 
-	substrate: AdrSpecies
-	bacteria: AdrSpecies
+	nutrients: AdrSpecies
+	bacteria:  AdrSpecies
+	inactive:  VectorT
 
 	_species: list[AdrSpecies]
 
