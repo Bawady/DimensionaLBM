@@ -70,7 +70,7 @@ class Scenario(ABC, Generic[T]):
 
 		for name, rgba in dump_data.items():
 			rgba_masked = np.where((lbm.boundary_geometry() > 0)[..., np.newaxis], (0, 0, 0, 1), rgba)
-			plt_img.imsave(dump_dir_p / f"{name}_{lbm._runs}.png", rgba_masked, dpi=600)
+			plt_img.imsave(dump_dir_p / f"{name}_{lbm.runs}.png", rgba_masked, dpi=600)
 
 	def post_run(self, lbm: T) -> None:
 		pass

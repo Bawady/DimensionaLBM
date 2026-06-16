@@ -54,15 +54,20 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 	density: VectorT
 
 	us: UnitSystem[ModeT]
+	boundaries: BoundaryCollection
 
 	_width: ScalarT
 	_height: ScalarT
 	_x: int
 	_y: int
-	_runs: int
 	_lattice: DdQqLattice
-	boundaries: BoundaryCollection
 	_dt: ScalarT
+	_runs: int
+
+	@property
+	def runs(self) -> int:
+		"""The amount of time steps the LBM has already iterated."""
+		return self._runs
 
 	@property
 	def x(self) -> int:
@@ -167,7 +172,7 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 		self.collide()
 		self.stream()
 		for boundary in self.boundaries:
-			boundary.apply_boundaries(self.f, self.density, self.u, self._runs * self.dt)
+			boundary.apply_boundaries(self.f, self.density, self.u, self._runs * self.dx)
 		self._runs += 1
 
 	def initialize_populations(self) -> None:

@@ -85,7 +85,7 @@ class Turek(Scenario[TRTLBM]):
 		vor_rgba = cmap(vorticity_scaled)
 		rgba_masked = np.where((lbm.boundary_geometry() > 0)[..., np.newaxis], (0, 0, 0, 1), vor_rgba)
 
-		plt_img.imsave(pathlib.Path(dump_dir) / f"vorticity_{lbm._runs}.png", rgba_masked, dpi=600)
+		plt_img.imsave(pathlib.Path(dump_dir) / f"vorticity_{lbm.runs}.png", rgba_masked, dpi=600)
 
 
 if __name__ == "__main__":
