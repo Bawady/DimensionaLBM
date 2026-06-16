@@ -11,7 +11,7 @@ from numpy import ndarray
 from pint.facets.numpy.quantity import NumpyQuantity
 from pint.facets.plain import PlainQuantity
 
-from dimensional_lbm.boundaries.boundary import Boundary
+from dimensional_lbm.boundaries.boundary import Boundary, TimeCallbackList
 from dimensional_lbm.boundaries.wall_detector import WallDetector
 from dimensional_lbm.unit_system_if import ScalarT, VectorT
 
@@ -30,19 +30,19 @@ class _CornerOrientation(Enum):
 
 class _VelocityProfile(Generic[ScalarT, VectorT]):
 	_profile : VectorT
-	_callbacks : list[tuple[Any, VectorCallback]]
+	_callbacks : TimeCallbackList
 	_last_time : ScalarT
 	_lbm: LBM
 
 	def __init__(self, lbm: LBM) -> None:
 		self._profile = cast("VectorT", lbm.us.quantity(np.zeros((lbm.y, lbm.x, lbm.lattice.D)), "m/s"))
-		self._callbacks = []
+		self._callbacks = TimeCallbackList(lbm, "m/s")
 		self._last_time = cast("ScalarT", lbm.us.quantity(0, "sec"))
 		self._lbm = lbm
 
 	def __setitem__(self, key: Any, value: VectorT | VectorCallback) -> None:
 		if callable(value):
-			self._callbacks.append((key, value))
+			self._callbacks.append(key, value)
 		elif isinstance(self._profile, NumpyQuantity) and isinstance(value, NumpyQuantity):
 			self._profile[key] = self._lbm.us.to_unit(value, str(self._profile.units))
 		else:
@@ -53,9 +53,6 @@ class _VelocityProfile(Generic[ScalarT, VectorT]):
 			for cb in self._callbacks:
 				self._profile[cb[0]] = cb[-1](time)
 			self._last_time = time
-#			print((self._profile[0,0,0] / self._lbm.us.quantity(10, "mm") * self._lbm.us.quantity(4, "us")).to_base_units())
-#
-# 			print(self._profile[0,0,0])
 		return self._profile
 
 	@property
@@ -68,19 +65,19 @@ class _VelocityProfile(Generic[ScalarT, VectorT]):
 
 class _DensityProfile(Generic[ScalarT, VectorT]):
 	_profile : VectorT
-	_callbacks : list[tuple[Any, ScalarCallback]]
+	_callbacks : TimeCallbackList
 	_last_time : ScalarT
 	_lbm: LBM
 
 	def __init__(self, lbm: LBM) -> None:
 		self._profile = cast("VectorT", lbm.us.quantity(np.zeros((lbm.y, lbm.x)), "kg/m**3"))
-		self._callbacks = []
+		self._callbacks = TimeCallbackList(lbm, "kg/m**3")
 		self._last_time = cast("ScalarT", lbm.us.quantity(0, "sec"))
 		self._lbm = lbm
 
 	def __setitem__(self, key: Any, value: ScalarT | ScalarCallback) -> None:
 		if callable(value):
-			self._callbacks.append((key, value))
+			self._callbacks.append(key, value)
 		elif isinstance(self._profile, NumpyQuantity) and isinstance(value, PlainQuantity):
 			self._profile[key] = self._lbm.us.to_unit(value, str(self._profile.units))
 		else:
