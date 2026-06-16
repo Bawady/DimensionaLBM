@@ -47,6 +47,9 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 		self.__ureg.setup_matplotlib(True)
 		self.__mode = _mode or Dimensional()
 
+	def define_unit(self, unit_str: str) -> None:
+		self.__ureg.define(unit_str)
+
 	@overload
 	def quantity(self: "UnitSystem[Dimensional]", value: float, unit: str) -> PlainQuantity[float]: ...
 

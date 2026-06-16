@@ -79,6 +79,8 @@ class Scenario(ABC, Generic[T]):
 		_lbm = lbm()
 
 		us = UnitSystem()
+		us.define_unit("cfu = [population]")
+
 		if self.characteristic_quantities and conversion_mode == NonDimensional:
 			us = us.with_characteristic_quantities(self.characteristic_quantities)
 		elif conversion_mode == MagnitudeOnly:

@@ -11,7 +11,7 @@ import matplotlib.image as plt_img
 import numpy as np
 
 from dimensional_lbm.adr_lbm import AdrLBM
-from dimensional_lbm.conversion_mode import Dimensional
+from dimensional_lbm.conversion_mode import Dimensional, NonDimensional
 from dimensional_lbm.lattices.d2q5 import D2Q5
 from dimensional_lbm.unit_system_if import ScalarQuantityDefinition
 from scenarios.scenario import Scenario
@@ -32,41 +32,42 @@ class DHW24(Scenario[AdrLBM]):
 		lbm.lattice = D2Q5(lbm.us.quantity(0.2, "mm"), lbm.us.quantity(1, "s"))
 
 		tau_sub = lbm.us.quantity(2.5, "s")
-		lbm.substrate = lbm.add_species(tau=tau_sub, unit="mol/mm**2")
-		lbm.substrate.density[:, :] = lbm.us.quantity(2.2, "mol/mm**2") # 0.087
+		lbm.substrate = lbm.add_species(tau=tau_sub, unit="g/ml")
+		lbm.substrate.density[:, :] = lbm.us.quantity(0.72, "g/ml")
 
 		# tau_bac from relative diffusivity: D_bac = diff_bac * D_sub,
 		# D = (tau - dt/2) * cs^2  =>  tau_bac = dt/2 + diff_bac * (tau_sub - dt/2)
 		diffusion_bac = lbm.us.quantity(1.33e-5, "cm**2/s") #0.05 * (tau_sub - 0.5) * lbm.lattice.cs**2 # bacteria diffusivity relative to substrate (Agar; from Murray)
-		tau_bac = diffusion_bac * lbm.lattice.cs_n2 + lbm.lattice.dt / 2
-		lbm.bacteria = lbm.add_species(tau=tau_bac, unit="mol/mm**2")
-		lbm.bacteria.density[lbm.y // 2, lbm.x // 2] = lbm.us.quantity(25, "mol/mm**2") # 1
+		tau_bac = 1.67 * (diffusion_bac * lbm.lattice.cs_n2 + lbm.lattice.dt / 2)
+		lbm.bacteria = lbm.add_species(tau=tau_bac, unit="cfu/ml")
+		lbm.bacteria.density[lbm.y // 2, lbm.x // 2] = lbm.us.quantity(8e3, "cfu/ml") # should be in non_dim, inspired by 1e9 cfu/ml found somewhere
 
-		lbm.dead = lbm.us.quantity(np.zeros((lbm.y, lbm.x)), "mol/mm**2")
+		lbm.dead = lbm.us.quantity(np.zeros((lbm.y, lbm.x)), "cfu/ml")
 
 #		alpha1 = 2400 #lbm.us.quantity(41.67e3, "ml/mol")
 #		alpha2 = 120 #lbm.us.quantity(1.67e-5, "l/mol")
-		alpha1 = lbm.us.quantity(96, "mm**2/mol")
-		alpha2 = lbm.us.quantity(4.8, "mm**2/mol")
-		k = lbm.us.quantity(0.04, "mm**2/mol")
+		alpha1 = lbm.us.quantity(96, "ml/cfu")
+		alpha2 = lbm.us.quantity(4.8, "ml/g")
+
+		k1 = lbm.us.quantity(0.04, "ml/cfu")
+		k2 = lbm.us.quantity(0.04, "ml/g")
 
 		print("Diff bacteria", diffusion_bac)
 		print("tau bacteria", tau_bac)
 		print("tau substrate", tau_sub)
 		print("alpha1", alpha1)
 		print("alpha2", alpha2)
-		print("k", k)
 
 		def react() -> None:
 			sub, bac = lbm.substrate, lbm.bacteria
-			growth = k * sub.density * np.maximum(bac.density, 0)
+			growth = sub.density * np.maximum(bac.density, 0)
 			death = bac.density / (
 				(1 + sub.density * alpha2) * (1 + bac.density * alpha1)
 			)
 			lbm.dead += death
 			for i, w in enumerate(lbm.lattice.weights):
-				sub.fcoll[i] -= w * growth
-				bac.fcoll[i] += w * (growth - death)
+				sub.fcoll[i] -= w * k1 * growth
+				bac.fcoll[i] += w * (k2 * growth - death)
 
 		lbm.react = react
 		lbm.stream = lbm.stream_periodic
@@ -91,6 +92,6 @@ class DHW24(Scenario[AdrLBM]):
 
 
 if __name__ == "__main__":
-	characteristic_quantities: list[ScalarQuantityDefinition] = [(0.2, "mm"), (1, "s"), (1, "kg/m**3"), (1, "mol")]
-	sim = DHW24(AdrLBM, characteristic_quantities, conversion_mode=Dimensional)
-	sim.run(5000, dump_period=500, dump_dir=pathlib.Path("test/dhw24_units"))
+	characteristic_quantities: list[ScalarQuantityDefinition] = [(0.2, "mm"), (1, "s"), (2.8, "g/ml"), (8e3, "cfu")]
+	sim = DHW24(AdrLBM, characteristic_quantities, conversion_mode=NonDimensional)
+	sim.run(2500, dump_period=100, dump_dir=pathlib.Path("test/dhw24_exp"))
