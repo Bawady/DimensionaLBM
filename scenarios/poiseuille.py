@@ -36,7 +36,7 @@ class Poiseuille(Scenario[BGKLBM]):
 		for y in range(lbm.y):
 			# Poiseuille source velocity profile
 			inlet_speed = max_speed / (lbm.y - 1) ** 2 * y * (lbm.y - 1 - y)
-			zou_he.velocity_profile[y, 0] = lambda step, t=t_ramp, speed=inlet_speed: speed * (1 - math.exp(-(step/t)**2)) * np.array([1, 0])
+			zou_he.velocity_profile[y, 0] = lambda time, t=t_ramp, speed=inlet_speed: speed * (1 - math.exp(-(time/t)**2)) * np.array([1, 0])
 			# Poiseuille sink density profile
 			zou_he.density_profile[y, -1] = initial_density
 

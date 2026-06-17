@@ -33,10 +33,10 @@ class LidDrivenCavity(Scenario[BGKLBM]):
 		zou_he.geometry[-1, :] = 1
 
 		self.max_speed = lbm.us.quantity(0.256, "m/s")
-		t_ramp = lbm.us.quantity(30, "us")
+		t_ramp = lbm.us.quantity(30, "s")
 		for x in range(lbm.x):
-			zou_he.velocity_profile[0, x] = lambda step, s=self.max_speed, t=t_ramp: (
-				s * (1 - math.exp(-((step / t) ** 2))) * np.array([1, 0])
+			zou_he.velocity_profile[0, x] = lambda time, s=self.max_speed, t=t_ramp: (
+				s * (1 - math.exp(-((time/ t) ** 2))) * np.array([1, 0])
 			)
 
 		lbm.boundaries += zou_he

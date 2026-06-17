@@ -45,11 +45,6 @@ class TimeCallbackList:
 		self._items: list[tuple[Any, Any]] = []
 
 	def append(self, key: Any, callback: Any) -> None:
-		if isinstance(self._lbm.us.mode, Dimensional):
-			ureg = pint.get_application_registry()
-			example_time = ureg.Quantity(1.0, "s")
-			return_q = ureg.Quantity(1.0, self._return_unit)
-			callback = unit_jit.jit_closure(callback, (example_time,), return_unit=return_q)
 		self._items.append((key, callback))
 
 	def __iter__(self) -> Iterator[tuple[Any, Any]]:

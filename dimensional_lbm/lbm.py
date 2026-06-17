@@ -172,7 +172,7 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 		self.collide()
 		self.stream()
 		for boundary in self.boundaries:
-			boundary.apply_boundaries(self.f, self.density, self.u, self._runs * self.dx)
+			boundary.apply_boundaries(self.f, self.density, self.u, self._runs * self.dt)
 		self._runs += 1
 
 	def initialize_populations(self) -> None:
