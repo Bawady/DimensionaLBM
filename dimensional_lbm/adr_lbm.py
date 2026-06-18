@@ -1,11 +1,20 @@
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
-from dimensional_lbm.boundaries.boundary import Boundary
 from dimensional_lbm.conversion_mode import ModeT
 from dimensional_lbm.lbm import LBM
 from dimensional_lbm.unit_system_if import ScalarT, VectorT
+
+if TYPE_CHECKING:
+	from dimensional_lbm.lattices.ddqq_lattice import DdQqLattice
+
+
+def from_diffusivity(diffusivity: ScalarT, lattice: DdQqLattice[ScalarT, VectorT]) -> ScalarT:
+	"""Compute the diffusive BGK relaxation time from the diffusivity."""
+	# Pint's scalar operator stubs widen the result type, so restore the known ScalarT.
+	return 2 / 3 * diffusivity * lattice.cs_n2 + lattice.dt / 2
 
 
 @dataclass
@@ -26,31 +35,26 @@ class AdrLBM(LBM[ModeT, ScalarT, VectorT]):
 	Uses periodic streaming — no boundary conditions are required.
 	"""
 
-	nutrients: AdrSpecies
-	bacteria:  AdrSpecies
+	nutrients: AdrSpecies[ScalarT, VectorT]
+	bacteria:  AdrSpecies[ScalarT, VectorT]
 	inactive:  VectorT
 
-	_species: list[AdrSpecies]
+	_species: list[AdrSpecies[ScalarT, VectorT]]
 
 	def __init__(self) -> None:
 		super().__init__()
 		self._species = []
 
-	def initialize_fields(self) -> None:
-		# Reinitialize existing species when grid dimensions change.
-		for s in self._species:
-			s.density = np.zeros((self._y, self._x))
-			arr = np.zeros((self._lattice.Q, self._y, self._x))
-			s.f, s.feq, s.fcoll = arr, arr.copy(), arr.copy()
-
-	def add_species(self, tau: ScalarT, unit: str) -> AdrSpecies:
+	def add_species(self, tau: ScalarT, unit: str) -> AdrSpecies[ScalarT, VectorT]:
 		"""Add a scalar species with the given BGK relaxation time."""
 		arr = self.us.quantity(np.zeros((self._lattice.Q, self._y, self._x)), unit)
-		species = AdrSpecies(
+		# us.quantity cannot infer the unbound VectorT and resolves it to its default, so re-tie
+		# the species to this LBM's VectorT to match the _species list.
+		species = cast("AdrSpecies[ScalarT, VectorT]", AdrSpecies(
 			density=self.us.quantity(np.zeros((self._y, self._x)), unit),
 			f=arr, feq=arr.copy(), fcoll=arr.copy(),
 			tau=tau,
-		)
+		))
 		self._species.append(species)
 		return species
 
@@ -62,7 +66,8 @@ class AdrLBM(LBM[ModeT, ScalarT, VectorT]):
 	def collide(self) -> None:
 		for s in self._species:
 			relax = float(self.us.magnitude(self._lattice.dt / s.tau))
-			s.fcoll = (1 - relax) * s.f + relax * s.feq
+			# Pint's float * VectorT operator stubs widen the result; restore the known VectorT.
+			s.fcoll = cast("VectorT", (1 - relax) * s.f + relax * s.feq)
 
 	def react(self) -> None:
 		"""Apply reaction source terms to fcoll. Assign a closure to lbm.react to override."""

@@ -1,81 +1,75 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, Any, Generic
+from typing import TYPE_CHECKING, Any, Generic, Self
 
 import numpy as np
-import pint
-import unit_jit
 from PIL import Image
 
-from dimensional_lbm.conversion_mode import Dimensional
 from dimensional_lbm.unit_system_if import ScalarT, VectorT
 
 if TYPE_CHECKING:
-	from collections.abc import Iterator
+	from collections.abc import Callable, Iterator
 
+	from dimensional_lbm._typing import NDIndex
 	from dimensional_lbm.lbm import LBM
 
 
 class TimeCallbackList:
 	"""Ordered list of ``(key, callable)`` pairs for time-dependent boundary callbacks.
 
-	Each callable must accept a single argument — the current simulation time — and
-	return a field value with a known physical dimension.  The expected dimensions are
-	declared at construction via *return_unit* (a unit string such as ``"m/s"``).
-
-	In Dimensional mode, every registered callable is automatically passed through
-	``unit_jit.jit_closure``: its body is abstract-interpreted once at registration
-	time, raising ``TypeError`` immediately if a dimensional inconsistency is found
-	(e.g. dividing by a length instead of a time).  Inside the unit-jit fast zone
-	the callable then runs on plain SI floats.  In all other modes the callable is
-	stored and called unchanged.
+	Each callable accepts a single argument — the current simulation time — and returns
+	the field value for the boundary cells selected by *key*.
 
 	Usage in a boundary class::
 
-		self._velocity_callbacks = TimeCallbackList(lbm, "m/s")
-		self._velocity_callbacks.append(key, lambda step, u=u0, t=t_ramp: ...)
+		self._velocity_callbacks = TimeCallbackList()
+		self._velocity_callbacks.append(key, lambda time, u=u0, t=t_ramp: ...)
 		for key, cb in self._velocity_callbacks:
 			field[key] = cb(time)
 	"""
 
-	def __init__(self, lbm: LBM, return_unit: str) -> None:
-		self._lbm = lbm
-		self._return_unit = return_unit
+	def __init__(self) -> None:
 		self._items: list[tuple[Any, Any]] = []
 
-	def append(self, key: Any, callback: Any) -> None:
+	def append(self, key: NDIndex, callback: Callable[..., object]) -> None:
 		self._items.append((key, callback))
 
 	def __iter__(self) -> Iterator[tuple[Any, Any]]:
+		"""Iterate over the registered ``(key, callable)`` pairs."""
 		return iter(self._items)
 
 	def __len__(self) -> int:
+		"""Return the number of registered callbacks."""
 		return len(self._items)
 
 	def __bool__(self) -> bool:
+		"""Return whether any callbacks are registered."""
 		return bool(self._items)
 
 
-class BoundaryCollection(list["Boundary"]):
+class BoundaryCollection(list["Boundary[ScalarT, VectorT]"], Generic[ScalarT, VectorT]):
 	"""List of boundaries that supports ``lbm.boundaries += boundary`` without explicit keys."""
 
-	def __add__(self, boundary: Boundary) -> BoundaryCollection:  # type: ignore [override]
+	def __add__(self, boundary: Boundary[ScalarT, VectorT]) -> BoundaryCollection[ScalarT, VectorT]:  # type: ignore[override]
+		"""Append ``boundary`` and return the collection."""
 		self.append(boundary)
 		return self
 
-	def __iadd__(self, boundary: Boundary) -> BoundaryCollection:  # type: ignore[override]
+	def __iadd__(self, boundary: Boundary[ScalarT, VectorT]) -> Self:  # type: ignore[override]
+		"""Append ``boundary`` in place and return the collection."""
 		self.append(boundary)
 		return self
 
-	def __iter__(self) -> Iterator[Boundary]:
+	def __iter__(self) -> Iterator[Boundary[ScalarT, VectorT]]:
+		"""Iterate over the contained boundaries."""
 		return super().__iter__()
 
 
 class Boundary(ABC, Generic[ScalarT, VectorT]):
 
 	@abstractmethod
-	def __init__(self, lbm : LBM) -> None:
+	def __init__(self, lbm: LBM[Any, ScalarT, VectorT]) -> None:
 		pass
 
 	@abstractmethod

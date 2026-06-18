@@ -1,8 +1,12 @@
-from pathlib import Path
+
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pint
 from PIL import Image
+
+if TYPE_CHECKING:
+	from pathlib import Path
 
 
 class WallDetector:
@@ -88,7 +92,7 @@ class WallDetector:
 
 		if other_boundaries is not None:
 			if isinstance(other_boundaries, pint.Quantity):
-				other_boundaries = other_boundaries.magnitude
+				other_boundaries = np.asarray(other_boundaries.magnitude)
 			other_boundaries = other_boundaries.astype(np.int32)
 			combined = solid | other_boundaries
 		else:
@@ -186,11 +190,11 @@ class WallDetector:
 
 	def _merge_periodic_segments(self, segments: list[tuple[int, int, int]], max_coord: int, direction: str) -> list[tuple[int, int, int]]:
 		"""Merge segments that touch opposite edges (periodic boundary)."""
-		if len(segments) < 2:
+		if len(segments) < 2:  # noqa: PLR2004 (dedicated constant for 2 not needed here, meaning clear)
 			return segments
 
 		# Group by static coordinate
-		by_static = {}
+		by_static: dict[int, list[tuple[int, int]]] = {}
 		for seg in segments:
 			static, start, end = seg
 			if static not in by_static:
@@ -202,7 +206,7 @@ class WallDetector:
 
 		merged = []
 		for static, segs in by_static.items():
-			if len(segs) >= 2:
+			if len(segs) >= 2:  # noqa: PLR2004 (also here no constant needed)
 				# Check if there's a segment at start (0) and end (max_coord-1)
 				at_start = [s for s in segs if s[0] == 0]
 				at_end = [s for s in segs if s[1] == max_coord - 1]
@@ -213,7 +217,7 @@ class WallDetector:
 					end_seg = at_end[0]
 
 					# Remove both from segs
-					segs = [s for s in segs if s not in (start_seg, end_seg)]
+					segs = [s for s in segs if s not in (start_seg, end_seg)]  # noqa: PLW2901 (length of by_static dict unchanged by thsi value modification - loop still terminates)
 					# Add merged segment (end_seg.start to start_seg.end, wrapping)
 					segs.append((end_seg[0], start_seg[1]))
 

@@ -7,10 +7,10 @@ import pint
 from pint.facets.numpy.quantity import NumpyQuantity
 from pint.facets.plain import PlainQuantity
 
-from dimensional_lbm.conversion_mode import ConversionMode, Dimensional, MagnitudeOnly, NonDimensional
+from dimensional_lbm.conversion_mode import ConversionMode, Dimensional, NonDimensional
 
 type PintQuantityScalar = PlainQuantity[float] | PlainQuantity[int]
-type PintQuantityVector = NumpyQuantity
+type PintQuantityVector = NumpyQuantity[np.ndarray]
 type PintQuantity = PintQuantityScalar | PintQuantityVector
 
 type ScalarMagnitude = float | int
@@ -24,15 +24,25 @@ type Quantity = Magnitude | PintQuantity
 
 type ScalarQuantityDefinition = tuple[ScalarMagnitude, str]
 
-ScalarT = TypeVar("ScalarT", PintQuantityScalar, ScalarMagnitude)
-VectorT = TypeVar("VectorT", PintQuantityVector, VectorMagnitude)
+ScalarT = TypeVar("ScalarT", PintQuantityScalar, ScalarMagnitude, default=PintQuantityScalar)
+VectorT = TypeVar("VectorT", PintQuantityVector, VectorMagnitude, default=PintQuantityVector)
 
 
-class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
+def as_magnitude_array(x: PintQuantityVector | VectorMagnitude) -> np.ndarray:
+	"""Return the underlying ndarray of a (possibly unit-carrying) vector field.
+
+	The result is a view into the original buffer, so in-place updates propagate back.
+	"""
+	if isinstance(x, np.ndarray):
+		return x
+	return cast("PlainQuantity[np.ndarray]", x).magnitude
+
+
+class UnitSystem[Mode: (Dimensional, NonDimensional)]:
 	"""A generic, fully typed, unit system for different conversion modes."""
 
 	__characteristic_quantities: list[PintQuantityScalar]
-	__ureg: pint.UnitRegistry
+	__ureg: pint.UnitRegistry[float]
 	__mode: ConversionMode
 
 	@property
@@ -43,30 +53,24 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 	def __init__(self, _mode: ConversionMode | None = None) -> None:
 		"""Initialize an empty unit system."""
 		self.__characteristic_quantities = []
-		self.__ureg = cast("pint.UnitRegistry", pint.get_application_registry())
-		self.__ureg.setup_matplotlib(True)
+		self.__ureg = cast("pint.UnitRegistry[float]", pint.get_application_registry())
+		self.__ureg.setup_matplotlib(enable=True)
 		self.__mode = _mode or Dimensional()
 
 	def define_unit(self, unit_str: str) -> None:
 		self.__ureg.define(unit_str)
 
 	@overload
-	def quantity(self: "UnitSystem[Dimensional]", value: float, unit: str) -> PlainQuantity[float]: ...
+	def quantity(self: UnitSystem[Dimensional], value: float, unit: str) -> PlainQuantity[float]: ...
 
 	@overload
-	def quantity(self: "UnitSystem[Dimensional]", value: np.ndarray, unit: str) -> NumpyQuantity: ...
+	def quantity(self: UnitSystem[Dimensional], value: np.ndarray, unit: str) -> PintQuantityVector: ...
 
 	@overload
-	def quantity(self: "UnitSystem[NonDimensional]", value: float, unit: str) -> float: ...
+	def quantity(self: UnitSystem[NonDimensional], value: float, unit: str) -> float: ...
 
 	@overload
-	def quantity(self: "UnitSystem[NonDimensional]", value: np.ndarray, unit: str) -> np.ndarray: ...
-
-	@overload
-	def quantity(self: "UnitSystem[MagnitudeOnly]", value: float, unit: str) -> float: ...
-
-	@overload
-	def quantity(self: "UnitSystem[MagnitudeOnly]", value: np.ndarray, unit: str) -> np.ndarray: ...
+	def quantity(self: UnitSystem[NonDimensional], value: np.ndarray, unit: str) -> np.ndarray: ...
 
 	@overload
 	def quantity(self, value: ScalarMagnitude, unit: str) -> ScalarT: ...
@@ -76,23 +80,21 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 
 	def quantity(self, value: float | np.ndarray, unit: str) -> Quantity:
 		"""Return the specified unit carrying quantity converted to the the unit system's conversion mode."""
-		if isinstance(self.__mode, MagnitudeOnly):
-			return value
+		# Pint's `Quantity(...)` constructor overloads do not propagate the magnitude type
+		# (they resolve to PlainQuantity[Any]). Given `value: float | np.ndarray`, the result is
+		# a float scalar or an array quantity, so we restore that known type here.
+		q = cast("PlainQuantity[float] | PintQuantityVector", self.__ureg.Quantity(value, unit))
 
-		q = self.__ureg.Quantity(value, unit)
 		if isinstance(self.__mode, Dimensional):
 			return q
-		if isinstance(self.__mode, NonDimensional):
-			return self._non_dimensionalize(q)
 
-		msg: str = f"Unknown conversion mode {self.__mode}"
-		raise ValueError(msg)
+		return self._non_dimensionalize(q)
 
 	def __set_characteristic_quantities(self, quantities: list[PintQuantityScalar]) -> None:
 		# Must only be called with valid quantities (as guaranteed within with_characteristic_quantities.)
 		self.__characteristic_quantities = quantities
 
-	def with_characteristic_quantities(self, definitions: list[ScalarQuantityDefinition]) -> "UnitSystem[NonDimensional]":
+	def with_characteristic_quantities(self, definitions: list[ScalarQuantityDefinition]) -> UnitSystem[NonDimensional]:
 		"""Create a new unit system out of this one using the given characteristic quantities to non dimensional future quantities.
 
 		There must be at least 3, independent, scalar quantities. Otherwise a ValueError will be raised.
@@ -106,12 +108,6 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 			msg = f"At least three characteristic quantities must be specified, but only {len(quantities)} where: {quantities}"
 			raise ValueError(msg)
 
-		# They are all required to be scalars
-		non_scalar_idxs: list[int] = [i for i, q in enumerate(quantities) if not isinstance(q.magnitude, (int, float))]
-		if len(non_scalar_idxs) > 0:
-			msg = f"Characteristic quantities must be scalar. However, the quantities at the following indices are not scalar: {non_scalar_idxs}"
-			raise ValueError(msg)
-
 		qs: dict[str, PintQuantityScalar] = {}
 		for i in range(len(quantities)):
 			qs[chr(ord("a") + i)] = quantities[i]
@@ -121,19 +117,16 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 			msg = "The specified characteristic quantities are not independent!"
 			raise ValueError(msg)
 
-		non_dim_us = UnitSystem(_mode=NonDimensional())
+		non_dim_us: UnitSystem[NonDimensional] = UnitSystem(_mode=NonDimensional())
 		non_dim_us.__set_characteristic_quantities(quantities)
 		non_dim_us.__ureg = self.__ureg
 
 		return non_dim_us
 
-	def with_magnitude_only(self) -> "UnitSystem[MagnitudeOnly]":
-		"""Create a new unit system out of this one configured to only provide quantity magnitudes from now on."""
-		return UnitSystem(_mode=MagnitudeOnly())
-
 	def __pi_theorem_typed(self, quantities: dict[str, PintQuantityScalar]) -> list[dict[str, float]]:
 		"""Typed wrapper around Pint's Pi theorem to facilitate static type checking."""
-		return cast("list[dict[str, float]]", self.__ureg.pi_theorem(quantities))
+		# Pint ships `pi_theorem` without type annotations, so the member access is untyped.
+		return cast("list[dict[str, float]]", self.__ureg.pi_theorem(quantities))  # pyright: ignore[reportUnknownMemberType]
 
 	@overload
 	def magnitude(self, q: float) -> float: ...
@@ -169,7 +162,7 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 	def _non_dimensionalize(self, q: PlainQuantity[float]) -> float: ...
 
 	@overload
-	def _non_dimensionalize(self, q: NumpyQuantity) -> np.ndarray: ...
+	def _non_dimensionalize(self, q: PintQuantityVector) -> np.ndarray: ...
 
 	def _non_dimensionalize(self, q: Quantity) -> float | np.ndarray:
 		if isinstance(q, (int, float, np.ndarray)):
@@ -196,9 +189,15 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 		for key in coeffs[0]:
 			if key != "q" and key in qs:
 				p: int = int(coeffs[0][key])
-				scale *= qs[key] ** p
+				# Pint's scalar `**`/`*` operator stubs drop the magnitude type; the runtime
+				# result is a Pint scalar, so we restore the known type.
+				scale = cast("PintQuantityScalar", scale * qs[key] ** p)
 		d = 1 / coeffs[0]["q"]
-		return (x * scale**d).to_base_units()
+		# Pint operators on a NumpyQuantity are stubbed to return PlainQuantity rather than
+		# NumpyQuantity, so the result is not seen as PintQuantity even though it is one at
+		# runtime; the casts restore the declared return type.
+		scaled = cast("PintQuantity", x * scale**d)
+		return cast("PintQuantity", scaled.to_base_units())
 
 	@overload
 	def to_unit(self, x: float, unit: str) -> float: ...
@@ -213,20 +212,20 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 	def to_unit(self, x: PlainQuantity[int], unit: str) ->PlainQuantity[int]: ...
 
 	@overload
-	def to_unit(self, x: NumpyQuantity, unit: str) -> NumpyQuantity: ...
+	def to_unit(self, x: PintQuantityVector, unit: str) -> PintQuantityVector: ...
 
 	def to_unit(self, x: Quantity, unit: str) -> Quantity:
 		"""Return x converted to the given unit (must have same dimensionality)."""
-		# TODO: Either handle MangitudeOnly here (by passiong an optional unit for x), or remove this mode altogether
 		if isinstance(x, (int, float, np.ndarray)):
 			return x
-		return x.to(unit)
+		# Pint's `to` has unannotated *contexts/**kwargs, so the member type is partially unknown.
+		return x.to(unit)  # pyright: ignore[reportUnknownMemberType]
 
 	@overload
 	def dim(self, x: float, unit: str) -> PlainQuantity[float]: ...
 
 	@overload
-	def dim(self, x: np.ndarray, unit: str) -> NumpyQuantity: ...
+	def dim(self, x: np.ndarray, unit: str) -> PintQuantityVector: ...
 
 	@overload
 	def dim(self, x: PlainQuantity[float], unit: str) ->PlainQuantity[float]: ...
@@ -235,13 +234,14 @@ class UnitSystem[Mode: (Dimensional, NonDimensional, MagnitudeOnly)]:
 	def dim(self, x: PlainQuantity[int], unit: str) ->PlainQuantity[int]: ...
 
 	@overload
-	def dim(self, x: NumpyQuantity, unit: str) -> NumpyQuantity: ...
+	def dim(self, x: PintQuantityVector, unit: str) -> PintQuantityVector: ...
 
 	def dim(self, x: Quantity, unit: str) -> Quantity:
 		"""Dimensionalize x to the given unit (already dimensional quantities are checked to have the given unit's dimensionality)."""
 		if isinstance(x, (int, float, np.ndarray)):
-			target = self.__ureg.Quantity(1, unit)
-			return self.__apply_pi_theorem(self.__ureg.Quantity(x, "1"), 1 / target)
+			target = cast("PintQuantityScalar", self.__ureg.Quantity(1, unit))
+			x_dimensionless = cast("PintQuantity", self.__ureg.Quantity(x, "1"))
+			return self.__apply_pi_theorem(x_dimensionless, 1 / target)
 
 		if x.dimensionality != self.__ureg.Quantity(1, unit).dimensionality:
 			extra_msg = "Attempted to dimensionalize already dimensional quantity to different dimensionality."

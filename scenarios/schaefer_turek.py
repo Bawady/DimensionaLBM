@@ -1,6 +1,6 @@
-import math
-import os
 import pathlib
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import matplotlib as mpl
 import matplotlib.image as plt_img
@@ -8,11 +8,12 @@ import numpy as np
 
 from dimensional_lbm.boundaries.zero_gradient import ZeroGradient
 from dimensional_lbm.boundaries.zou_he import ZouHe
-from dimensional_lbm.conversion_mode import Dimensional
 from dimensional_lbm.lattices.d2q9 import D2Q9
 from dimensional_lbm.trt_lbm import TRTLBM, tau_minus_from_magic_param, tau_plus_from_viscosity
-from dimensional_lbm.unit_system_if import ScalarQuantityDefinition
 from scenarios.scenario import Scenario
+
+if TYPE_CHECKING:
+	from dimensional_lbm.unit_system_if import ScalarQuantityDefinition
 
 
 class SchaeferTurek(Scenario[TRTLBM]):
@@ -36,14 +37,12 @@ class SchaeferTurek(Scenario[TRTLBM]):
 		zou_he.geometry[0, :] = 1  # top
 		zou_he.geometry[-1, :] = 1  # bottom
 
-		# Physical-space coordinate grids.
-		y_phys = (lbm.y - 1 - np.arange(lbm.y)) * dx
-
 		# Inlet: velocity profile with ramp-up (Turek case 2D-3)
 		u_max = lbm.us.quantity(1.5, "m/s")
 		t_ramp = lbm.us.quantity(8, "s")
 		for y_idx in range(1, lbm.y - 1):
-			y_p = y_phys[y_idx]
+			# Physical-space coordinate on y axis
+			y_p = (lbm.y - 1 - y_idx) * dx
 			u_in = u_max * (4.0 * y_p * (lbm.height - y_p) / lbm.height**2)
 			# 2D-3
 			zou_he.velocity_profile[y_idx, 0] = lambda time, u=u_in, t=t_ramp: u * np.sin(time * np.pi / t) * np.array([1, 0])
@@ -65,7 +64,7 @@ class SchaeferTurek(Scenario[TRTLBM]):
 		lbm.boundaries += zou_he
 		lbm.boundaries += zero_grad
 
-	def dump(self, lbm: TRTLBM, dump_dir: os.PathLike) -> None:
+	def dump(self, lbm: TRTLBM, dump_dir: Path) -> None:
 		# Dump density and velocity fields
 		super().dump(lbm, dump_dir)
 

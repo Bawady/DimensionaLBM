@@ -7,9 +7,6 @@ class Dimensional:
 class NonDimensional:
 	pass
 
-class MagnitudeOnly:
-	pass
+type ConversionMode = Dimensional | NonDimensional
 
-type ConversionMode = Dimensional | NonDimensional | MagnitudeOnly
-
-ModeT = TypeVar("ModeT", Dimensional, NonDimensional, MagnitudeOnly)
+ModeT = TypeVar("ModeT", Dimensional, NonDimensional, default=Dimensional)

@@ -3,28 +3,24 @@
 Reproduces the patterns from "Lattice Boltzmann modelling of bacterial colony patterns"
 """
 
-import os
 import pathlib
+from typing import TYPE_CHECKING
 
 import matplotlib.image as plt_img
 import numpy as np
 
-from dimensional_lbm.adr_lbm import AdrLBM
-from dimensional_lbm.conversion_mode import Dimensional, NonDimensional
+from dimensional_lbm.adr_lbm import AdrLBM, from_diffusivity
+from dimensional_lbm.conversion_mode import NonDimensional
 from dimensional_lbm.lattices.d2q5 import D2Q5
-from dimensional_lbm.unit_system_if import ScalarQuantityDefinition
 from scenarios.scenario import Scenario
+
+if TYPE_CHECKING:
+	import os
+
+	from dimensional_lbm.unit_system_if import ScalarQuantityDefinition
 
 
 class DHW24(Scenario[AdrLBM]):
-	"""Bacterial colony growth on a periodic domain.
-
-	Three coupled fields are evolved:
-	- nutrients: nutrient that diffuses and is consumed by bacteria
-	- bacteria:  motile cells that grow by consuming nutrients and die due to stress
-	- inactive:  accumulated inactive cells (no-motile)
-	"""
-
 	def define(self, lbm: AdrLBM) -> None:
 		lbm.width = lbm.us.quantity(5, "cm")
 		lbm.height = lbm.us.quantity(5, "cm")
@@ -39,9 +35,9 @@ class DHW24(Scenario[AdrLBM]):
 
 		# [1.33e-5, 6.65e-6, 2.66e-6] cm**2/s
 		diffusion_bac = lbm.us.quantity(2.66e-6, "cm**2/s") # bacteria diffusivity in 2-4e-6 acc to Murray (Intro to Bio Mod 2)
-		tau_bac = 2/3 * diffusion_bac * lbm.lattice.cs_n2 + dt / 2
+		tau_bac = from_diffusivity(diffusion_bac, lbm.lattice)
 		lbm.bacteria = lbm.add_species(tau=tau_bac, unit="cfu/ml")
-		lbm.bacteria.density[lbm.y // 2, lbm.x // 2] = lbm.us.quantity(1e9, "cfu/ml") # inspired by 1e9 cfu/ml found somewhere, Murray uses 1e-8 cells/ml
+		lbm.bacteria.density[lbm.y // 2, lbm.x // 2] = lbm.us.quantity(1e9, "cfu/ml")
 
 		lbm.inactive = lbm.us.quantity(np.zeros((lbm.y, lbm.x)), "cfu/ml")
 
@@ -79,7 +75,7 @@ class DHW24(Scenario[AdrLBM]):
 		inactive_mag = lbm.us.magnitude(lbm.inactive)
 		rgb[:, :, 2] = np.clip(inactive_mag  / max(1e-12, np.max(inactive_mag)) * 255, 0, 255).astype(np.uint8)
 
-		plt_img.imsave(dump_dir / f"colony_{lbm._runs:06d}.png", rgb, dpi=300)
+		plt_img.imsave(dump_dir / f"colony_{lbm.runs:06d}.png", rgb, dpi=300)
 
 
 if __name__ == "__main__":

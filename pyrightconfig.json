@@ -1,4 +1,10 @@
 {
   "venvPath": ".",
-  "venv": ".venv"
+  "venv": ".venv",
+  "typeCheckingMode": "standard",
+  "exclude": [
+    "scenarios/ecoli_colony.py",
+    "scenarios/ldc_configurable.py"
+  ],
+  "stubPath": "typings"
 }

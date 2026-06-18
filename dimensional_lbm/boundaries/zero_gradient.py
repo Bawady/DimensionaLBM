@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 class _GradientArray(np.ndarray):
 	"""ndarray subclass that silently converts Enum values to their integer value on item assignment."""
 
-	def __setitem__(self, key: Any, value: Any) -> None:
+	def __setitem__(self, key: Any, value: object) -> None:  # noqa: ANN401  (overrides ndarray.__setitem__; key must match NumPy's broad, non-public index type)
 		if isinstance(value, Enum):
 			value = value.value
 		super().__setitem__(key, value)
@@ -93,18 +93,19 @@ class _BottomGradient(_ZeroGradientBoundary[ScalarT, VectorT]):
 
 
 class ZeroGradient(Boundary[ScalarT, VectorT]):
-	_boundaries: list[_ZeroGradientBoundary]
-	_lattice: DdQqLattice
-	_lbm: LBM
+	_boundaries: list[_ZeroGradientBoundary[ScalarT, VectorT]]
+	_lattice: DdQqLattice[ScalarT, VectorT]
+	_lbm: LBM[Any, ScalarT, VectorT]
 	zero_gradient: _GradientArray
 
 	class GradientDirection(Enum):
+		"""Yerogradient boundaries can be towards the LEFT, RIGHT, UP, or DOWN."""
 		LEFT  = 0
 		RIGHT = 1
 		UP    = 2
 		DOWN  = 3
 
-	def __init__(self, lbm: LBM) -> None:
+	def __init__(self, lbm: LBM[Any, ScalarT, VectorT]) -> None:
 		self._lattice = lbm.lattice
 		self._lbm = lbm
 

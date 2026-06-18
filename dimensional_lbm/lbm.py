@@ -14,14 +14,16 @@ The LBM algorithm follows the standard workflow:
 """
 
 from abc import ABC, abstractmethod
-from typing import Generic, cast
+from typing import TYPE_CHECKING, Generic, cast
 
 import numpy as np
 
 from dimensional_lbm.boundaries.boundary import BoundaryCollection
 from dimensional_lbm.conversion_mode import ModeT
-from dimensional_lbm.lattices.ddqq_lattice import DdQqLattice
 from dimensional_lbm.unit_system_if import ScalarT, UnitSystem, VectorT
+
+if TYPE_CHECKING:
+	from dimensional_lbm.lattices.ddqq_lattice import DdQqLattice
 
 
 class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
@@ -54,13 +56,13 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 	density: VectorT
 
 	us: UnitSystem[ModeT]
-	boundaries: BoundaryCollection
+	boundaries: BoundaryCollection[ScalarT, VectorT]
 
 	_width: ScalarT
 	_height: ScalarT
 	_x: int
 	_y: int
-	_lattice: DdQqLattice
+	_lattice: DdQqLattice[ScalarT, VectorT]
 	_dt: ScalarT
 	_runs: int
 
@@ -80,12 +82,12 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 		return self._y
 
 	@property
-	def lattice(self) -> DdQqLattice:
+	def lattice(self) -> DdQqLattice[ScalarT, VectorT]:
 		"""The lattice structure used for the simulation (e.g., D2Q5, D2Q9)."""
 		return self._lattice
 
 	@lattice.setter
-	def lattice(self, lattice: DdQqLattice) -> None:
+	def lattice(self, lattice: DdQqLattice[ScalarT, VectorT]) -> None:
 		self._lattice = lattice
 
 		if hasattr(self ,"_width"):
@@ -216,7 +218,6 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 		"""
 		self.density = self.f.sum(axis=0)
 
-		# TODO: make work for arbitrary lattice dimensions
 		self.u[:, :, 0] = self.lattice.q * np.sum(self.lattice.dir_x[:, None, None] * self.f, axis=0) / self.density
 		self.u[:, :, 1] = self.lattice.q * np.sum(self.lattice.dir_y[:, None, None] * self.f, axis=0) / self.density
 
@@ -262,6 +263,6 @@ class LBM(ABC, Generic[ModeT, ScalarT, VectorT]):
 	def _set_lattice_height(self) -> None:
 		y = int(self.us.magnitude(self._height / self._lattice.dx))
 		if y <= 0:
-			msg = f"'height' of the lattice must be greater 0 but is {y} for the provided domain width of '{self._height}' and dx '{self._lattice.dx}'."
+			msg = f"'height' of the lattice must be > 0 but is {y} for the provided domain width of '{self._height}' and dx '{self._lattice.dx}'."
 			raise ValueError(msg)
 		self._y = y

@@ -1,14 +1,13 @@
-from typing import ClassVar, cast
+from typing import ClassVar
 
 import numpy as np
-import pint
 
-from dimensional_lbm.unit_system_if import ScalarT, VectorT
+from dimensional_lbm.unit_system_if import ScalarT, VectorT, as_magnitude_array
 
 from .ddqq_lattice import DdQqLattice
 
 
-class D2Q9(DdQqLattice):
+class D2Q9(DdQqLattice[ScalarT, VectorT]):
 	D: ClassVar[int] = 2
 	Q: ClassVar[int] = 9
 
@@ -27,19 +26,19 @@ class D2Q9(DdQqLattice):
 		super().__init__(dx, dt)
 
 		self.cs = self.dx / (self.dt * np.sqrt(3))
-		self.cs_n2 = self.dt**2 * 3 / self.dx**2
-		self.cs_n4 = self.cs_n2**2
+		self.cs_n2 = self.dt**2 / (self.dx**2 / 3)
+		self.cs_n4 = self.dt**4 / (self.dx**4 / 9)
 
 	def stream_periodic(self, f_new: VectorT, f_old: VectorT) -> None:
-		mag_new = cast("np.ndarray", f_new.magnitude if isinstance(f_new, pint.Quantity) else f_new)
-		mag_old = cast("np.ndarray", f_old.magnitude if isinstance(f_old, pint.Quantity) else f_old)
+		mag_new = as_magnitude_array(f_new)
+		mag_old = as_magnitude_array(f_old)
 
 		for i in range(self.Q):
 			mag_new[i] = np.roll(mag_old[i], (self.dir_y[i], self.dir_x[i]), axis=(0, 1))
 
 	def stream(self, f_new: VectorT, f_old: VectorT) -> None:
-		mag_new = cast("np.ndarray", f_new.magnitude if isinstance(f_new, pint.Quantity) else f_new)
-		mag_old = cast("np.ndarray", f_old.magnitude if isinstance(f_old, pint.Quantity) else f_old)
+		mag_new = as_magnitude_array(f_new)
+		mag_old = as_magnitude_array(f_old)
 
 		height, width = mag_new.shape[1], mag_new.shape[2]
 
@@ -58,7 +57,8 @@ class D2Q9(DdQqLattice):
 	def equilibrium(self, density: VectorT, velocity: VectorT, eq: VectorT) -> None:
 		vel_x = self.dir_x * self.q
 		vel_y = self.dir_y * self.q
-		u_sq = self.cs_n2 / 2.0 * (velocity[:, :, 0]**2 + velocity[:, :, 1]**2)
+		# Pint's array-operator stubs yield a spurious `datetime` union -> Pyright can't infer expressions with arithmetic on indexed quantity arrays
+		u_sq = self.cs_n2 / 2.0 * (velocity[:, :, 0]**2 + velocity[:, :, 1]**2) # pyright: ignore[reportUnknownVariableType, reportOperatorIssue]
 		for i in range(self.Q):
 			lin_term = self.cs_n2 * (vel_x[i] * velocity[:, :, 0] + vel_y[i] * velocity[:, :, 1])
 			eq[i] = self.weights[i] * density * (1 + lin_term + lin_term**2 / 2.0 - u_sq)

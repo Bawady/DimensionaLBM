@@ -31,3 +31,4 @@ convention = "google"
 
 [lint.per-file-ignores]
 "dimensional_lbm/boundaries/test_wall_detector.py" = ["S101"]
+"dimensional_lbm/boundaries/zou_he.py" = ["PLR0913"]

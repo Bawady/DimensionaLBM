@@ -1,21 +1,16 @@
-import os
 import pathlib
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 import matplotlib.image as plt_img
 import numpy as np
 from matplotlib import cm
-from unit_jit import unit_jit
 
-from dimensional_lbm.conversion_mode import ConversionMode, Dimensional, MagnitudeOnly, NonDimensional
+from dimensional_lbm.conversion_mode import ConversionMode, Dimensional, NonDimensional
 from dimensional_lbm.lbm import LBM
-from dimensional_lbm.unit_system_if import (
-	ScalarQuantityDefinition,
-	UnitSystem,
-)
+from dimensional_lbm.unit_system_if import QuantityVector, ScalarQuantityDefinition, UnitSystem
 
-T = TypeVar("T", bound=LBM)
+T = TypeVar("T", bound=LBM[Any, Any, Any])
 
 
 class Scenario(ABC, Generic[T]):
@@ -53,12 +48,17 @@ class Scenario(ABC, Generic[T]):
 			self._lbm.single_step()
 		self.post_run(self._lbm)
 
-	def dump(self, lbm: T, dump_dir: os.PathLike) -> None:
+	def dump(self, lbm: T, dump_dir: pathlib.Path) -> None:
 		dump_dir_p = pathlib.Path(dump_dir)
 		dump_dir_p.mkdir(exist_ok=True)
 
-		density_mag = lbm.us.magnitude(lbm.us.dim(lbm.density, "kg/m**3"))
-		velocity_mag = lbm.us.magnitude(lbm.us.dim(lbm.u, "m/s"))
+		dens: QuantityVector = lbm.density
+		dim_dens = lbm.us.dim(dens, "kg/m**3")
+		density_mag = lbm.us.magnitude(dim_dens)
+
+		vel: QuantityVector = lbm.u
+		vel_dim = lbm.us.dim(vel, "m/s")
+		velocity_mag = lbm.us.magnitude(vel_dim)
 
 		cmap = cm.get_cmap("viridis")
 		density_rgba = cmap(density_mag / np.max(density_mag))
@@ -78,13 +78,12 @@ class Scenario(ABC, Generic[T]):
 	def _create(self, lbm: type[T], conversion_mode: type[ConversionMode] = Dimensional) -> T:
 		_lbm = lbm()
 
-		us = UnitSystem()
+		us: UnitSystem[Any] = UnitSystem()
 		us.define_unit("cfu = [population]")
 
 		if self.characteristic_quantities and conversion_mode == NonDimensional:
 			us = us.with_characteristic_quantities(self.characteristic_quantities)
-		elif conversion_mode == MagnitudeOnly:
-			us = us.with_magnitude_only()
 
-		_lbm._set_unit_system(us)  # noqa: SLF001 Justification: Both is "internal" framework code and in here it is known what the private method does
+		# Justification: Both is "internal" framework code and in here it is known what the private method does
+		_lbm._set_unit_system(us) # pyright: ignore[reportPrivateUsage]  # noqa: SLF001
 		return _lbm

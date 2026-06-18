@@ -1,13 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, ClassVar, Generic
 
-import numpy as np
-
 from dimensional_lbm.unit_system_if import ScalarT, VectorT
 
-# For circular dependence due to type hints
 if TYPE_CHECKING:
-	from .ddqq_lattice import DdQqLattice
+	import numpy as np
 
 
 class DdQqLattice(ABC, Generic[ScalarT, VectorT]):
@@ -34,28 +31,28 @@ class DdQqLattice(ABC, Generic[ScalarT, VectorT]):
 
 		self.q = dx / dt
 
-	@classmethod
-	def __init_subclass(cls, **kwargs) -> None:  # noqa: ANN003 (PEP 487 doesn't provide )
+	def __init_subclass__(cls, **kwargs: object) -> None:
+		"""Enforce that concrete lattice subclasses define the required class variables."""
 		super().__init_subclass__(**kwargs)
 
-		if not hasattr(cls, "D") or cls.D is None:
+		if not hasattr(cls, "D"):
 			msg: str = f"{cls.__name__} must define a value for class variable 'D'"
 			raise TypeError(msg)
 
-		if not hasattr(cls, "Q") or cls.Q is None:
-			msg: str = f"{cls.__name__} must define a value for class variable 'Q'"
+		if not hasattr(cls, "Q"):
+			msg = f"{cls.__name__} must define a value for class variable 'Q'"
 			raise TypeError(msg)
 
-		if not hasattr(cls, "weights") or cls.weights is None or not (cls.weights.ndim == 1 and cls.weights.size == cls.Q):
-			msg: str = f"{cls.__name__} must set class variable 'weights' to one dimensional array of length {cls.Q}"
+		if not hasattr(cls, "weights") or not (cls.weights.ndim == 1 and cls.weights.size == cls.Q):
+			msg = f"{cls.__name__} must set class variable 'weights' to one dimensional array of length {cls.Q}"
 			raise TypeError(msg)
 
-		if not hasattr(cls, "dir_x") or cls.dir_x is None or not (cls.dir_x.ndim == 1 and cls.dir_x.size == cls.Q):
-			msg: str = f"{cls.__name__} must set class variable 'dir_x' to one dimensional array of length {cls.Q}"
+		if not hasattr(cls, "dir_x") or not (cls.dir_x.ndim == 1 and cls.dir_x.size == cls.Q):
+			msg = f"{cls.__name__} must set class variable 'dir_x' to one dimensional array of length {cls.Q}"
 			raise TypeError(msg)
 
-		if not hasattr(cls, "dir_y") or cls.dir_y is None or not (cls.dir_y.ndim == 1 and cls.dir_y.size == cls.Q):
-			msg: str = f"{cls.__name__} must set class variable 'dir_y' to one dimensional array of length {cls.Q}"
+		if not hasattr(cls, "dir_y") or not (cls.dir_y.ndim == 1 and cls.dir_y.size == cls.Q):
+			msg = f"{cls.__name__} must set class variable 'dir_y' to one dimensional array of length {cls.Q}"
 			raise TypeError(msg)
 
 	@abstractmethod

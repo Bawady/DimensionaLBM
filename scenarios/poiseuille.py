@@ -1,5 +1,6 @@
 import math
 import pathlib
+from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -9,9 +10,11 @@ from dimensional_lbm.boundaries.boundary import load_geometry
 from dimensional_lbm.boundaries.zou_he import ZouHe
 from dimensional_lbm.conversion_mode import NonDimensional
 from dimensional_lbm.lattices.d2q9 import D2Q9
-from dimensional_lbm.lbm import LBM
-from dimensional_lbm.unit_system_if import ScalarQuantityDefinition
 from scenarios.scenario import Scenario
+
+if TYPE_CHECKING:
+	from dimensional_lbm.lbm import LBM
+	from dimensional_lbm.unit_system_if import ScalarQuantityDefinition
 
 
 class Poiseuille(Scenario[BGKLBM]):

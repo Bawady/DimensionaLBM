@@ -6,16 +6,15 @@ from typing import TYPE_CHECKING, Any, Generic, cast
 
 import numpy as np
 from numpy import ndarray
-
-# TODO: These imports should not be necessary here
 from pint.facets.numpy.quantity import NumpyQuantity
 from pint.facets.plain import PlainQuantity
 
 from dimensional_lbm.boundaries.boundary import Boundary, TimeCallbackList
 from dimensional_lbm.boundaries.wall_detector import WallDetector
-from dimensional_lbm.unit_system_if import ScalarT, VectorT
+from dimensional_lbm.unit_system_if import Quantity, ScalarT, VectorT, as_magnitude_array
 
 if TYPE_CHECKING:
+	from dimensional_lbm._typing import NDIndex
 	from dimensional_lbm.boundaries.callbacks import ScalarCallback, VectorCallback
 	from dimensional_lbm.lattices.ddqq_lattice import DdQqLattice
 	from dimensional_lbm.lbm import LBM
@@ -32,15 +31,15 @@ class _VelocityProfile(Generic[ScalarT, VectorT]):
 	_profile : VectorT
 	_callbacks : TimeCallbackList
 	_last_time : ScalarT
-	_lbm: LBM
+	_lbm: LBM[Any, ScalarT, VectorT]
 
-	def __init__(self, lbm: LBM) -> None:
+	def __init__(self, lbm: LBM[Any, ScalarT, VectorT]) -> None:
 		self._profile = cast("VectorT", lbm.us.quantity(np.zeros((lbm.y, lbm.x, lbm.lattice.D)), "m/s"))
-		self._callbacks = TimeCallbackList(lbm, "m/s")
+		self._callbacks = TimeCallbackList()
 		self._last_time = cast("ScalarT", lbm.us.quantity(0, "sec"))
 		self._lbm = lbm
 
-	def __setitem__(self, key: Any, value: VectorT | VectorCallback) -> None:
+	def __setitem__(self, key: NDIndex, value: VectorT | VectorCallback[ScalarT, VectorT]) -> None:
 		if callable(value):
 			self._callbacks.append(key, value)
 		elif isinstance(self._profile, NumpyQuantity) and isinstance(value, NumpyQuantity):
@@ -67,15 +66,15 @@ class _DensityProfile(Generic[ScalarT, VectorT]):
 	_profile : VectorT
 	_callbacks : TimeCallbackList
 	_last_time : ScalarT
-	_lbm: LBM
+	_lbm: LBM[Any, ScalarT, VectorT]
 
-	def __init__(self, lbm: LBM) -> None:
+	def __init__(self, lbm: LBM[Any, ScalarT, VectorT]) -> None:
 		self._profile = cast("VectorT", lbm.us.quantity(np.zeros((lbm.y, lbm.x)), "kg/m**3"))
-		self._callbacks = TimeCallbackList(lbm, "kg/m**3")
+		self._callbacks = TimeCallbackList()
 		self._last_time = cast("ScalarT", lbm.us.quantity(0, "sec"))
 		self._lbm = lbm
 
-	def __setitem__(self, key: Any, value: ScalarT | ScalarCallback) -> None:
+	def __setitem__(self, key: NDIndex, value: ScalarT | ScalarCallback[ScalarT]) -> None:
 		if callable(value):
 			self._callbacks.append(key, value)
 		elif isinstance(self._profile, NumpyQuantity) and isinstance(value, PlainQuantity):
@@ -92,11 +91,10 @@ class _DensityProfile(Generic[ScalarT, VectorT]):
 
 	@property
 	def geometry(self) -> np.ndarray:
-		geometry = np.where(self._profile > 0, 1, 0)
+		geometry = np.where(as_magnitude_array(self._profile) > 0, 1, 0)
 		for cb in self._callbacks:
 			geometry[cb[0]] = 1
 		return geometry
-
 
 
 class _ZouHeBoundary(ABC, Generic[ScalarT, VectorT]):
@@ -111,8 +109,8 @@ class _BottomWall(_ZouHeBoundary[ScalarT, VectorT]):
 	def __init__(
 		self, q: ScalarT,
 		y: int, x0: int, x1: int,
-		velocity_profile: _VelocityProfile | None = None,
-		density_profile: _DensityProfile | None = None
+		velocity_profile: _VelocityProfile[ScalarT, VectorT] | None = None,
+		density_profile: _DensityProfile[ScalarT, VectorT] | None = None
 	) -> None:
 		self._q = q
 		self._y = y
@@ -126,9 +124,13 @@ class _BottomWall(_ZouHeBoundary[ScalarT, VectorT]):
 		velocity_profile = self.velocity_profile
 		density_profile = self.density_profile
 
+		# Pint's NumPy operator stubs yield a spurious datetime union; the cast restores a usable Quantity type.
+		f_tangential = cast("Quantity", f[4, y, x0:x1] + f[5, y, x0:x1] + f[8, y, x0:x1])
+		known = cast("Quantity", f[0, y, x0:x1] + f[1, y, x0:x1] + f[2, y, x0:x1] + 2 * f_tangential)  # pyright: ignore[reportOperatorIssue]
+
 		if density_profile is None:
-			scale = q / (q + u[y, x0:x1, 1])
-			rho[y, x0:x1] = scale * (f[0, y, x0:x1] + f[1, y, x0:x1] + f[2, y, x0:x1] + 2 * (f[4, y, x0:x1] + f[5, y, x0:x1] + f[8, y, x0:x1]))
+			scale = q / cast("Quantity", q + u[y, x0:x1, 1])
+			rho[y, x0:x1] = scale * known  # pyright: ignore[reportArgumentType]
 			if velocity_profile is not None:
 				u[y, x0:x1] = velocity_profile.get(time)[y, x0:x1]
 			else:
@@ -137,9 +139,7 @@ class _BottomWall(_ZouHeBoundary[ScalarT, VectorT]):
 			density = density_profile.get(time)[y, x0:x1]
 			rho[y, x0:x1] = density
 			u[y, x0:x1, 0] *= 0
-			u[y, x0:x1, 1] = q * (
-				(f[0, y, x0:x1] + f[1, y, x0:x1] + f[2, y, x0:x1] + 2 * (f[4, y, x0:x1] + f[5, y, x0:x1] + f[8, y, x0:x1])) / density - 1
-			)
+			u[y, x0:x1, 1] = q * (known / density - 1)  # pyright: ignore[reportArgumentType]
 		else:
 			msg: str = "Neither velocity nor density profile given"
 			raise ValueError(msg)
@@ -158,8 +158,8 @@ class _BottomWall(_ZouHeBoundary[ScalarT, VectorT]):
 class _TopWall(_ZouHeBoundary[ScalarT, VectorT]):
 	def __init__(
 		self, q: ScalarT, y: int, x0: int, x1: int,
-		velocity_profile: _VelocityProfile | None = None,
-		density_profile: _DensityProfile | None = None
+		velocity_profile: _VelocityProfile[ScalarT, VectorT] | None = None,
+		density_profile: _DensityProfile[ScalarT, VectorT] | None = None
 	) -> None:
 		self._q = q
 		self._y = y
@@ -168,14 +168,18 @@ class _TopWall(_ZouHeBoundary[ScalarT, VectorT]):
 		self.velocity_profile = velocity_profile
 		self.density_profile = density_profile
 
-	def apply(self, f: VectorT, rho: VectorT, u: VectorT,time: ScalarT) -> None:
+	def apply(self, f: VectorT, rho: VectorT, u: VectorT, time: ScalarT) -> None:
 		y, x0, x1, q = self._y, self._x0, self._x1, self._q
 		velocity_profile = self.velocity_profile
 		density_profile = self.density_profile
 
+		# Pint's NumPy operator stubs yield a spurious datetime union; the cast restores a usable Quantity type.
+		f_tangential = cast("Quantity", f[3, y, x0:x1] + f[6, y, x0:x1] + f[7, y, x0:x1])
+		known = cast("Quantity", f[0, y, x0:x1] + f[1, y, x0:x1] + f[2, y, x0:x1] + 2 * f_tangential)  # pyright: ignore[reportOperatorIssue]
+
 		if density_profile is None:
-			scale = q / (q - u[y, x0:x1, 1])
-			rho[y, x0:x1] = scale * (f[0, y, x0:x1] + f[1, y, x0:x1] + f[2, y, x0:x1] + 2 * (f[3, y, x0:x1] + f[6, y, x0:x1] + f[7, y, x0:x1]))
+			scale = q / cast("Quantity", q - u[y, x0:x1, 1])
+			rho[y, x0:x1] = scale * known  # pyright: ignore[reportArgumentType]
 			if velocity_profile is not None:
 				u[y, x0:x1] = velocity_profile.get(time)[y, x0:x1]
 			else:
@@ -184,9 +188,7 @@ class _TopWall(_ZouHeBoundary[ScalarT, VectorT]):
 			density = density_profile.get(time)[y, x0:x1]
 			rho[y, x0:x1] = density
 			u[y, x0:x1, 0] = 0
-			u[y, x0:x1, 1] = q * (
-				1 - (f[0, y, x0:x1] + f[1, y, x0:x1] + f[2, y, x0:x1] + 2 * (f[3, y, x0:x1] + f[6, y, x0:x1] + f[7, y, x0:x1])) / density
-			)
+			u[y, x0:x1, 1] = q * (1 - known / density)  # pyright: ignore[reportOperatorIssue, reportArgumentType]
 		else:
 			msg: str = "Neither velocity nor density profile given"
 			raise ValueError(msg)
@@ -205,8 +207,8 @@ class _TopWall(_ZouHeBoundary[ScalarT, VectorT]):
 class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
 	def __init__(
 		self, q: ScalarT, x: int, y0: int, y1: int,
-		velocity_profile: _VelocityProfile | None = None,
-		density_profile: _DensityProfile | None = None
+		velocity_profile: _VelocityProfile[ScalarT, VectorT] | None = None,
+		density_profile: _DensityProfile[ScalarT, VectorT] | None = None
 	) -> None:
 		self._q = q
 		self._x = x
@@ -220,9 +222,13 @@ class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
 		velocity_profile = self.velocity_profile
 		density_profile = self.density_profile
 
+		# Pint's NumPy operator stubs yield a spurious datetime union; the cast restores a usable Quantity type.
+		f_tangential = cast("Quantity", f[2, y0:y1, x] + f[6, y0:y1, x] + f[8, y0:y1, x])
+		known = cast("Quantity", f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * f_tangential)  # pyright: ignore[reportOperatorIssue]
+
 		if density_profile is None:
-			scale = q / (q - u[y0:y1, x, 0])
-			rho[y0:y1, x] = scale * (f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[2, y0:y1, x] + f[6, y0:y1, x] + f[8, y0:y1, x]))
+			scale = q / cast("Quantity", q - u[y0:y1, x, 0])
+			rho[y0:y1, x] = scale * known  # pyright: ignore[reportArgumentType]
 			if velocity_profile is not None:
 				u[y0:y1, x] = velocity_profile.get(time)[y0:y1, x]
 			else:
@@ -231,9 +237,7 @@ class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
 			density = density_profile.get(time)[y0:y1, x]
 			rho[y0:y1, x] = density
 			u[y0:y1, x, 1] = 0
-			u[y0:y1, x, 0] = q * (
-				1 - (f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[2, y0:y1, x] + f[6, y0:y1, x] + f[8, y0:y1, x])) / density
-			)
+			u[y0:y1, x, 0] = q * (1 - known / density)  # pyright: ignore[reportOperatorIssue, reportArgumentType]
 		else:
 			msg = "Neither velocity nor density profile given"
 			raise ValueError(msg)
@@ -252,8 +256,8 @@ class _LeftWall(_ZouHeBoundary[ScalarT, VectorT]):
 class _RightWall(_ZouHeBoundary[ScalarT, VectorT]):
 	def __init__(
 		self, q: ScalarT, x: int, y0: int, y1: int,
-		velocity_profile: _VelocityProfile | None = None,
-		density_profile: _DensityProfile | None = None
+		velocity_profile: _VelocityProfile[ScalarT, VectorT] | None = None,
+		density_profile: _DensityProfile[ScalarT, VectorT] | None = None
 	) -> None:
 		self._q = q
 		self._x = x
@@ -267,9 +271,13 @@ class _RightWall(_ZouHeBoundary[ScalarT, VectorT]):
 		velocity_profile = self.velocity_profile
 		density_profile = self.density_profile
 
+		# Pint's NumPy operator stubs yield a spurious datetime union; the cast restores a usable Quantity type.
+		f_tangential = cast("Quantity", f[1, y0:y1, x] + f[5, y0:y1, x] + f[7, y0:y1, x])
+		known = cast("Quantity", f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * f_tangential)  # pyright: ignore[reportOperatorIssue]
+
 		if density_profile is None:
-			scale = q / (q + u[y0:y1, x, 0])
-			rho[y0:y1, x] = scale * (f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[1, y0:y1, x] + f[5, y0:y1, x] + f[7, y0:y1, x]))
+			scale = q / cast("Quantity", q + u[y0:y1, x, 0])
+			rho[y0:y1, x] = scale * known  # pyright: ignore[reportArgumentType]
 			if velocity_profile is not None:
 				u[y0:y1, x] = velocity_profile.get(time)[y0:y1, x]
 			else:
@@ -278,9 +286,7 @@ class _RightWall(_ZouHeBoundary[ScalarT, VectorT]):
 			density = density_profile.get(time)[y0:y1, x]
 			rho[y0:y1, x] = density
 			u[y0:y1, x, 1] *= 0
-			u[y0:y1, x, 0] = q * (
-				(f[0, y0:y1, x] + f[3, y0:y1, x] + f[4, y0:y1, x] + 2 * (f[1, y0:y1, x] + f[5, y0:y1, x] + f[7, y0:y1, x])) / density - 1
-			)
+			u[y0:y1, x, 0] = q * (known / density - 1)  # pyright: ignore[reportArgumentType]
 		else:
 			msg = "Neither velocity nor density profile given"
 			raise ValueError(msg)
@@ -388,14 +394,14 @@ class _ConcaveCorner(_ZouHeBoundary[ScalarT, VectorT]):
 
 
 class ZouHe(Boundary[ScalarT, VectorT]):
-	_boundaries: list[_ZouHeBoundary]
-	_lattice: DdQqLattice
-	_lbm: LBM
+	_boundaries: list[_ZouHeBoundary[ScalarT, VectorT]]
+	_lattice: DdQqLattice[ScalarT, VectorT]
+	_lbm: LBM[Any, ScalarT, VectorT]
 	velocity_profile: _VelocityProfile[ScalarT, VectorT]
 	density_profile: _DensityProfile[ScalarT, VectorT]
 	geometry: np.ndarray
 
-	def __init__(self, lbm: LBM) -> None:
+	def __init__(self, lbm: LBM[Any, ScalarT, VectorT]) -> None:
 		super().__init__(lbm)
 		self._lattice = lbm.lattice
 		self._lbm = lbm
@@ -408,7 +414,8 @@ class ZouHe(Boundary[ScalarT, VectorT]):
 	def get_geometry(self) -> np.ndarray:
 		return np.where((self.geometry > 0) & (self.velocity_profile.geometry == 0) & (self.density_profile.geometry == 0), 1, 0)
 
-	def setup(self) -> None:
+	# method is simple and repetitive enough to be comprehensible despite length
+	def setup(self) -> None:  # noqa: C901, PLR0912
 		velocity_geometry = self.velocity_profile.geometry
 		density_geometry = self.density_profile.geometry
 		plain_geometry = np.where((self.geometry > 0) & (velocity_geometry == 0) & (density_geometry == 0), 1, 0)
