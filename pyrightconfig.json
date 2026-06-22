@@ -5,6 +5,5 @@
   "exclude": [
     "scenarios/ecoli_colony.py",
     "scenarios/ldc_configurable.py"
-  ],
-  "stubPath": "typings"
+  ]
 }

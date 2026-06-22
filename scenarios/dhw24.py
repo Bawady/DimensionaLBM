@@ -51,10 +51,10 @@ class DHW24(Scenario[AdrLBM]):
 		def react() -> None:
 			sub, bac = lbm.nutrients, lbm.bacteria
 			growth = sub.density * np.maximum(bac.density, 0)
-			death = bac.density / (
-				(1 + sub.density / alpha2) * (1 + bac.density / alpha1)
-			)
-			lbm.inactive += death
+			# Pint's NumPy operator stubs are incomplete, so Pyright mis-types this dimensionally
+			# correct arithmetic on quantity arrays (spurious datetime union); runtime is unaffected.
+			death = bac.density / ((1 + sub.density / alpha2) * (1 + bac.density / alpha1))  # pyright: ignore[reportOperatorIssue]
+			lbm.inactive += death  # pyright: ignore[reportAttributeAccessIssue]
 			for i, w in enumerate(lbm.lattice.weights):
 				bac.fcoll[i] += w * lbm.dt * (k1 * growth - k3 * death)
 				sub.fcoll[i] -= w * lbm.dt * k2 * growth

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 def from_diffusivity(diffusivity: ScalarT, lattice: DdQqLattice[ScalarT, VectorT]) -> ScalarT:
 	"""Compute the diffusive BGK relaxation time from the diffusivity."""
 	# Pint's scalar operator stubs widen the result type, so restore the known ScalarT.
-	return 2 / 3 * diffusivity * lattice.cs_n2 + lattice.dt / 2
+	return cast("ScalarT", 2 / 3 * diffusivity * lattice.cs_n2 + lattice.dt / 2)
 
 
 @dataclass
