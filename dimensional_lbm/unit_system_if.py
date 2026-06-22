@@ -3,7 +3,7 @@
 from typing import TypeVar, cast, overload
 
 import numpy as np
-import pint
+import pint  # Optionally change this to pintrs
 from pint.facets.numpy.quantity import NumpyQuantity
 from pint.facets.plain import PlainQuantity
 
