@@ -53,9 +53,10 @@ class DHW25(Scenario[AdrLBM]):
 		def react() -> None:
 			sub, bac = lbm.nutrients, lbm.bacteria
 			growth = sub.density * np.maximum(bac.density, 0)
-			# Pint's NumPy operator stubs are incomplete, so Pyright mis-types this dimensionally
-			# correct arithmetic on quantity arrays (spurious datetime union); runtime is unaffected.
-			death = bac.density / ((1 + sub.density / alpha2) * (1 + bac.density / alpha1))  # pyright: ignore[reportOperatorIssue]
+			# Pint's NumPy operator stubs are incomplete; runtime is unaffected.
+			death = bac.density / (
+				(1 + sub.density / alpha2) * (1 + bac.density / alpha1)
+			)  # pyright: ignore[reportOperatorIssue]
 			lbm.inactive += death  # pyright: ignore[reportAttributeAccessIssue]
 			for i, w in enumerate(lbm.lattice.weights):
 				bac.fcoll[i] += w * lbm.dt * (k1 * growth - k3 * death)
@@ -82,5 +83,5 @@ class DHW25(Scenario[AdrLBM]):
 
 if __name__ == "__main__":
 	characteristic_quantities: list[ScalarQuantityDefinition] = [(50, "um"), (.47, "s"), (0.035, "microgram"), (125, "cfu")]
-	sim = DHW24(AdrLBM, characteristic_quantities, conversion_mode=NonDimensional)
-	sim.run(5000, dump_period=250, dump_dir=pathlib.Path("dhw24"))
+	sim = DHW25(AdrLBM, characteristic_quantities, conversion_mode=NonDimensional)
+	sim.run(5000, dump_period=250, dump_dir=pathlib.Path("dhw25"))
