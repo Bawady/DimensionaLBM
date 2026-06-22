@@ -2,9 +2,9 @@ import pathlib
 from abc import ABC, abstractmethod
 from typing import Any, ClassVar, Generic, TypeVar
 
+import matplotlib as mpl
 import matplotlib.image as plt_img
 import numpy as np
-from matplotlib import cm
 
 from dimensional_lbm.conversion_mode import ConversionMode, Dimensional, NonDimensional
 from dimensional_lbm.lbm import LBM
@@ -63,7 +63,7 @@ class Scenario(ABC, Generic[T]):
 		vel_dim = lbm.us.dim(vel, "m/s")
 		velocity_mag = lbm.us.magnitude(vel_dim)
 
-		cmap = cm.get_cmap("viridis")
+		cmap = mpl.colormaps["viridis"]
 		density_rgba = cmap(density_mag / np.max(density_mag))
 
 		vel_abs = np.sqrt(velocity_mag[:, :, 0] ** 2 + velocity_mag[:, :, 1] ** 2)
