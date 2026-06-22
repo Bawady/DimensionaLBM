@@ -1,4 +1,4 @@
-"""Bacterial colony growth patterns (De Rosis, Harish & Wang 2024).
+"""Bacterial colony growth patterns (De Rosis, Harish & Wang 2025).
 
 Reproduces the patterns from "Lattice Boltzmann modelling of bacterial colony patterns"
 """
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
 	from dimensional_lbm.unit_system_if import ScalarQuantityDefinition
 
 
-class DHW24(Scenario[AdrLBM]):
+class DHW25(Scenario[AdrLBM]):
 	custom_units: ClassVar[list[str]] = ["cfu = [population]"]  # colony-forming units
 
 	def define(self, lbm: AdrLBM) -> None:

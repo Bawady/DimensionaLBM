@@ -34,7 +34,7 @@ scenarios/                    Ready-to-run example simulations
 ├── poiseuille.py             Poiseuille channel flow
 ├── ldc.py                    Lid-driven cavity (Ghia et al. validation; writes ldc.csv)
 ├── schaefer_turek.py         Schäfer–Turek 2D cylinder benchmark (laminar flow around a cylinder)
-└── dhw24.py                  Bacterial colony growth (De Rosis, Harish & Wang 2024)
+└── dhw25.py                  Bacterial colony growth (De Rosis, Harish & Wang 2025)
 
 geometries/                   Geometry mask images (pipe.png)
 pyproject.toml                Project metadata and dependencies
@@ -64,7 +64,7 @@ python -m scenarios.couette          # Couette flow
 python -m scenarios.poiseuille       # Poiseuille channel flow
 python -m scenarios.ldc              # Lid-driven cavity (also writes ldc.csv)
 python -m scenarios.schaefer_turek   # Schäfer–Turek cylinder benchmark
-python -m scenarios.dhw24            # Bacterial colony growth
+python -m scenarios.dhw25            # Bacterial colony growth
 ```
 
 ## Defining a new scenario
@@ -117,7 +117,7 @@ Notes:
   `zou_he.velocity_profile[0, x] = lambda time, u=u0: u * np.array([1, 0])`.
 - **Custom units** — declare domain-specific units on the scenario class via the `custom_units`
   attribute, e.g. `custom_units = ["cfu = [population]"]`; they are registered before `define` runs
-  (see `dhw24.py`).
+  (see `dhw25.py`).
 
 ## License
 
