@@ -1,6 +1,6 @@
 import pathlib
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar
+from typing import Any, ClassVar, Generic, TypeVar
 
 import matplotlib.image as plt_img
 import numpy as np
@@ -16,6 +16,9 @@ T = TypeVar("T", bound=LBM[Any, Any, Any])
 class Scenario(ABC, Generic[T]):
 	_lbm: T
 	characteristic_quantities: list[ScalarQuantityDefinition] | None = None
+
+	# Subclasses can override this to introduce domain-specific units.
+	custom_units: ClassVar[list[str]] = []
 
 	def __init__(
 		self,
@@ -79,7 +82,8 @@ class Scenario(ABC, Generic[T]):
 		_lbm = lbm()
 
 		us: UnitSystem[Any] = UnitSystem()
-		us.define_unit("cfu = [population]")
+		for unit_definition in self.custom_units:
+			us.define_unit(unit_definition)
 
 		if self.characteristic_quantities and conversion_mode == NonDimensional:
 			us = us.with_characteristic_quantities(self.characteristic_quantities)

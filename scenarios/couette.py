@@ -44,4 +44,4 @@ class Couette(Scenario[BGKLBM]):
 
 if __name__ == "__main__":
 	sim = Couette(BGKLBM)
-	sim.run(500, dump_period=50, dump_dir=Path("test/couette"))
+	sim.run(500, dump_period=50, dump_dir=Path("couette"))

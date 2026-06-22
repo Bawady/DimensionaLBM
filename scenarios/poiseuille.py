@@ -59,4 +59,4 @@ if __name__ == "__main__":
 	characteristic_quantities: list[ScalarQuantityDefinition] = [(1, "m"), (1, "s"), (1, "kg/m**3")]
 
 	sim = Poiseuille(BGKLBM, characteristic_quantities, conversion_mode=NonDimensional)
-	sim.run(5000, 100, pathlib.Path("test/poiseuille"))
+	sim.run(5000, 100, pathlib.Path("poiseuille"))

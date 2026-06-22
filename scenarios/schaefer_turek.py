@@ -87,4 +87,4 @@ if __name__ == "__main__":
 	characteristic_quantities: list[ScalarQuantityDefinition] = [(1, "cm"), (.25, "ms"), (1, "kg/m**3")]
 
 	sim = SchaeferTurek(TRTLBM, characteristic_quantities)
-	sim.run(32000, dump_period=250, dump_dir=pathlib.Path("test/turek"))
+	sim.run(32000, dump_period=250, dump_dir=pathlib.Path("turek"))

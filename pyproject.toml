@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "DimensionaLBM"
 version = "0.1.0"
@@ -15,3 +19,6 @@ dependencies = [
     "pintrs>=0.4.3",
 ]
 license = "MIT"
+
+[tool.setuptools.packages.find]
+include = ["dimensional_lbm*", "scenarios*"]

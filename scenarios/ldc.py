@@ -63,4 +63,4 @@ if __name__ == "__main__":
 	characteristic_quantities: list[ScalarQuantityDefinition] = [(1, "m"), (1, "s"), (1, "kg/m**3")]
 
 	sim = LidDrivenCavity(BGKLBM, characteristic_quantities, conversion_mode=Dimensional)
-	sim.run(2000, 100, Path("test/ldc"))
+	sim.run(2000, 100, Path("ldc"))

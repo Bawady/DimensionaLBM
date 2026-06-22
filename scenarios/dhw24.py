@@ -4,7 +4,7 @@ Reproduces the patterns from "Lattice Boltzmann modelling of bacterial colony pa
 """
 
 import pathlib
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import matplotlib.image as plt_img
 import numpy as np
@@ -21,6 +21,8 @@ if TYPE_CHECKING:
 
 
 class DHW24(Scenario[AdrLBM]):
+	custom_units: ClassVar[list[str]] = ["cfu = [population]"]  # colony-forming units
+
 	def define(self, lbm: AdrLBM) -> None:
 		lbm.width = lbm.us.quantity(5, "cm")
 		lbm.height = lbm.us.quantity(5, "cm")
@@ -81,4 +83,4 @@ class DHW24(Scenario[AdrLBM]):
 if __name__ == "__main__":
 	characteristic_quantities: list[ScalarQuantityDefinition] = [(50, "um"), (.47, "s"), (0.035, "microgram"), (125, "cfu")]
 	sim = DHW24(AdrLBM, characteristic_quantities, conversion_mode=NonDimensional)
-	sim.run(5000, dump_period=250, dump_dir=pathlib.Path("test/dhw24_exp"))
+	sim.run(5000, dump_period=250, dump_dir=pathlib.Path("dhw24"))
